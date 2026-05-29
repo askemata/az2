@@ -1,0 +1,2795 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#b8965a" id="theme-color-meta"/>
+<meta name="description" content="Askesis-Zettel — Editor Markdown Zettelkasten local-first. Projeto Askesis — askesis.hypotheses.org"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Askesis"/>
+<link rel="manifest" href="manifest.json"/>
+<title>Askesis-Zettel</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,500;1,300;1,400&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Literata:ital,opsz,wght@0,7..72,300;0,7..72,400;1,7..72,300;1,7..72,400&display=swap');
+
+/* ── Reset ── */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;font-family:'Spectral',Georgia,serif;font-size:13px}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-muted)}
+::selection{background:var(--selection)}
+
+/* ══════════════════════════════════════
+   DESIGN TOKEN SYSTEM
+   Palette: deep graphite + single amber accent
+   Light values used as subtle surface steps
+   ══════════════════════════════════════ */
+:root{
+  /* Surfaces — stepped graphite */
+  --bg-primary:#0e0e0e;
+  --bg-secondary:#141414;
+  --bg-tertiary:#1c1c1c;
+  --bg-hover:#222222;
+  --bg-active:#282828;
+
+  /* Borders — barely visible */
+  --border:#232323;
+  --border-light:#1c1c1c;
+  --border-med:#2d2d2d;
+
+  /* Text — warm grays */
+  --text-primary:#e6e2da;
+  --text-secondary:#7a766e;
+  --text-muted:#3e3c38;
+  --text-dim:#2a2826;
+
+  /* Accent — single amber-mineral tone, two intensities */
+  --accent:#b8965a;
+  --accent-dim:#6b5330;
+  --accent-glow:rgba(184,150,90,.12);
+
+  /* Semantic */
+  --link:#7aa8b8;
+  --tag:#1e1a12;
+  --tag-text:#9a7a48;
+  --scrollbar:#2a2826;
+  --shadow:0 16px 48px rgba(0,0,0,.8),0 4px 12px rgba(0,0,0,.5);
+  --shadow-sm:0 4px 16px rgba(0,0,0,.5);
+  --editor-bg:#0e0e0e;
+  --preview-bg:#111111;
+  --code-bg:#181818;
+  --selection:rgba(184,150,90,.18);
+
+  /* Syntax tokens */
+  --sh-head:#b8965a;
+  --sh-bold:#e6e2da;
+  --sh-italic:#9e9a92;
+  --sh-code:#7aa8b8;
+  --sh-cb:#6a8898;
+  --sh-quote:#524e48;
+  --sh-link:#7aa8b8;
+  --sh-hr:#282828;
+  --sh-list:#b8965a;
+  --sh-fm:#2e2c28;
+  --sh-wiki:#7aa8b8;
+  --sh-plain:#e6e2da;
+
+  /* Editor metrics */
+  --ed-pad-v:36px;
+  --ed-pad-h:44px;
+  --ed-font:'JetBrains Mono',monospace;
+  --ed-size:13px;
+  --ed-lh:1.95;
+}
+
+/* ══════════════════════════════════════
+   APP SHELL
+   ══════════════════════════════════════ */
+#app{
+  display:flex;flex-direction:column;
+  height:100dvh;
+  /* Fallback for Android Chrome / older browsers that don't support dvh */
+  height:calc(var(--vh, 1vh) * 100);
+  background:var(--bg-primary);
+  color:var(--text-primary);
+  overflow:hidden;
+}
+
+/* ── Install bar ── */
+#install-bar{
+  display:none;align-items:center;justify-content:center;
+  gap:10px;padding:9px 16px;
+  background:var(--accent);color:var(--bg-primary);
+  font-size:11px;cursor:pointer;border:none;width:100%;
+  letter-spacing:.05em;font-family:'Spectral',serif;
+  flex-shrink:0;text-align:center;
+}
+#install-bar:hover{opacity:.88}
+#install-bar.visible{display:flex}
+
+/* ── Titlebar ──
+   Thinner than before. Logo in serif. Minimal buttons.
+   A single amber 1px line runs the full width at the top.
+── */
+#titlebar{
+  display:flex;align-items:center;
+  padding:0 10px;height:40px;
+  background:var(--bg-secondary);
+  border-bottom:1px solid var(--border);
+  border-top:1.5px solid var(--accent);   /* ← identity mark */
+  gap:3px;flex-shrink:0;
+  user-select:none;overflow:hidden;
+}
+.tb-logo{
+  font-family:'Spectral',Georgia,serif;
+  font-size:14px;font-weight:300;
+  font-style:italic;
+  color:var(--accent);
+  letter-spacing:.08em;
+  flex-shrink:0;
+}
+.tb-logo span{
+  font-style:normal;
+  font-weight:400;
+  color:var(--text-muted);
+  font-size:11px;
+  margin-left:2px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+.tb-sep{
+  width:1px;height:14px;
+  background:var(--border-med);
+  margin:0 3px;flex-shrink:0;
+}
+.tb-btn{
+  display:flex;align-items:center;gap:3px;
+  padding:4px 8px;border-radius:3px;
+  cursor:pointer;color:var(--text-secondary);
+  font-size:11px;border:none;background:transparent;
+  transition:color .12s,background .12s;
+  font-family:'Spectral',serif;
+  letter-spacing:.04em;white-space:nowrap;flex-shrink:0;
+}
+.tb-btn:hover{background:var(--bg-hover);color:var(--text-primary)}
+.tb-btn.on{color:var(--accent)}
+.tb-btn.folder-active{color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-dim)}
+.tb-spacer{flex:1}
+
+/* View mode selector — refined pill */
+.vm-grp{
+  display:flex;
+  border:1px solid var(--border-med);
+  border-radius:3px;overflow:hidden;flex-shrink:0;
+}
+.vm-btn{
+  padding:3px 10px;cursor:pointer;border:none;
+  font-size:10px;background:transparent;
+  color:var(--text-muted);
+  font-family:'Spectral',serif;
+  letter-spacing:.05em;text-transform:uppercase;
+  transition:all .12s;
+}
+.vm-btn+.vm-btn{border-left:1px solid var(--border-med)}
+.vm-btn.on{background:var(--bg-active);color:var(--accent)}
+.vm-btn:hover:not(.on){background:var(--bg-hover);color:var(--text-secondary)}
+
+/* ── Tabs bar ── */
+#tabs-bar{
+  display:flex;align-items:stretch;
+  background:var(--bg-secondary);
+  border-bottom:1px solid var(--border);
+  overflow-x:auto;flex-shrink:0;
+  min-height:30px;
+}
+#tabs-bar::-webkit-scrollbar{height:0}
+.tab{
+  display:flex;align-items:center;gap:6px;
+  padding:0 14px;height:30px;flex-shrink:0;
+  cursor:pointer;
+  border-right:1px solid var(--border);
+  color:var(--text-muted);
+  font-size:11px;font-family:'Spectral',serif;
+  letter-spacing:.02em;
+  transition:color .12s,background .12s;
+  max-width:200px;position:relative;
+  white-space:nowrap;overflow:hidden;
+}
+.tab.on{
+  color:var(--text-primary);
+  background:var(--bg-primary);
+}
+.tab.on::after{
+  content:'';position:absolute;
+  top:0;left:0;right:0;height:1.5px;
+  background:var(--accent);
+}
+.tab:hover:not(.on){background:var(--bg-hover);color:var(--text-secondary)}
+.tab-name{overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.tab-x{
+  opacity:.3;width:14px;height:14px;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:2px;flex-shrink:0;font-size:14px;line-height:1;
+  color:var(--text-muted);transition:opacity .12s,color .12s;
+}
+.tab.on .tab-x{opacity:.5}
+.tab:hover .tab-x,.tab.on:hover .tab-x{opacity:.7}
+.tab-x:hover{opacity:1!important;color:var(--text-primary)}
+#tab-new{
+  padding:0 12px;height:30px;
+  display:flex;align-items:center;cursor:pointer;
+  color:var(--text-dim);font-size:18px;
+  transition:color .12s;flex-shrink:0;
+  line-height:1;background:none;border:none;
+}
+#tab-new:hover{color:var(--accent)}
+
+/* ══════════════════════════════════════
+   SIDEBAR
+   ══════════════════════════════════════ */
+#main{display:flex;flex:1;overflow:hidden}
+#sidebar{
+  width:228px;flex-shrink:0;
+  background:var(--bg-secondary);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  transition:width .18s ease;
+}
+#sidebar.closed{width:0;border:none}
+
+/* Sidebar tabs — minimal text only */
+#sb-header{
+  display:flex;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.sb-tab{
+  flex:1;padding:8px 0;text-align:center;cursor:pointer;
+  font-size:9px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--text-muted);
+  border-right:1px solid var(--border);
+  transition:color .12s,background .12s;
+  font-family:'Spectral',serif;
+}
+.sb-tab:last-child{border:none}
+.sb-tab.on{color:var(--accent);background:var(--bg-tertiary)}
+.sb-tab:hover:not(.on){color:var(--text-secondary)}
+
+#sb-body{flex:1;overflow-y:auto;padding:10px 8px}
+
+/* Search box */
+#sb-search{
+  display:flex;align-items:center;gap:6px;
+  margin-bottom:10px;
+  background:transparent;
+  border-bottom:1px solid var(--border);
+  padding:4px 6px 8px;
+}
+#sb-search input{
+  flex:1;background:transparent;border:none;outline:none;
+  color:var(--text-primary);font-size:11px;
+  font-family:'Spectral',serif;
+}
+#sb-search input::placeholder{color:var(--text-dim)}
+#sb-search .search-ico{color:var(--text-muted);font-size:12px;flex-shrink:0}
+
+/* Folder bar */
+#folder-bar{
+  display:none;align-items:center;gap:6px;
+  padding:5px 6px;
+  border-bottom:1px solid var(--border);
+  margin-bottom:8px;font-size:10px;color:var(--text-muted);
+  font-family:'Spectral',serif;
+  letter-spacing:.03em;
+}
+#folder-bar.visible{display:flex}
+#folder-bar span{
+  flex:1;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;color:var(--accent);font-style:italic;
+}
+#folder-bar button{
+  background:transparent;border:none;
+  color:var(--text-dim);cursor:pointer;
+  font-family:inherit;font-size:11px;
+  padding:2px 5px;border-radius:2px;
+  transition:color .12s;
+}
+#folder-bar button:hover{color:var(--text-primary)}
+
+/* Note items (flat list mode) */
+.ni{
+  padding:7px 8px;border-radius:3px;cursor:pointer;
+  margin-bottom:1px;position:relative;
+  transition:background .1s;
+  border-left:1.5px solid transparent;
+}
+.ni:hover{background:var(--bg-hover)}
+.ni.on{
+  background:var(--bg-active);
+  border-left-color:var(--accent);
+}
+.ni-title{
+  font-size:12px;font-family:'Spectral',serif;
+  color:var(--text-primary);margin-bottom:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  padding-right:20px;font-weight:400;
+}
+.ni.on .ni-title{color:var(--accent)}
+.ni-meta{font-size:9px;color:var(--text-muted);letter-spacing:.03em;font-family:'JetBrains Mono',monospace}
+.ni-tags{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px}
+.ni-del{
+  position:absolute;right:6px;top:7px;opacity:0;
+  font-size:11px;color:var(--text-muted);cursor:pointer;
+  padding:2px 4px;border-radius:2px;transition:opacity .12s;
+  border:none;background:transparent;font-family:inherit;
+}
+.ni:hover .ni-del{opacity:.35}
+.ni-del:hover{opacity:1!important;color:#c05050}
+
+.chip{
+  font-size:9px;padding:1px 6px;border-radius:2px;
+  background:var(--tag);color:var(--tag-text);
+  letter-spacing:.04em;font-family:'Spectral',serif;
+}
+.sb-sec{
+  font-size:9px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--text-dim);padding:8px 6px 4px;
+  margin-top:6px;font-family:'Spectral',serif;
+}
+.ol-item{
+  padding:4px 8px;cursor:pointer;font-size:11px;
+  font-family:'Spectral',serif;
+  color:var(--text-secondary);border-radius:3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  transition:color .1s,background .1s;
+}
+.ol-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+.bl-item{
+  padding:6px 8px;border-radius:3px;cursor:pointer;
+  margin-bottom:2px;
+  border-left:1.5px solid var(--accent-dim);
+  transition:border-color .1s,background .1s;
+  font-size:11px;font-family:'Spectral',serif;
+  color:var(--text-secondary);
+}
+.bl-item:hover{background:var(--bg-hover);border-left-color:var(--accent);color:var(--text-primary)}
+.sb-empty{color:var(--text-dim);font-size:11px;padding:6px 8px;font-style:italic;font-family:'Spectral',serif}
+
+/* ── Multi-folder sections in sidebar ── */
+.fld-section{margin-bottom:4px}
+.fld-header{
+  display:flex;align-items:center;gap:4px;
+  padding:5px 6px 5px 4px;
+  cursor:pointer;user-select:none;
+  border-radius:3px;
+  transition:background .1s;
+}
+.fld-header:hover{background:var(--bg-hover)}
+.fld-header-arrow{
+  font-size:8px;width:10px;text-align:center;
+  color:var(--text-dim);transition:transform .14s;flex-shrink:0;
+}
+.fld-header-arrow.open{transform:rotate(90deg)}
+.fld-header-name{
+  flex:1;font-size:11px;font-family:'Spectral',serif;
+  color:var(--accent);font-style:italic;letter-spacing:.02em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.fld-header-btns{display:flex;gap:1px;flex-shrink:0}
+.fld-btn{
+  background:transparent;border:none;cursor:pointer;
+  color:var(--text-dim);font-size:11px;padding:1px 4px;
+  border-radius:2px;line-height:1;transition:color .1s;
+  font-family:inherit;
+}
+.fld-btn:hover{color:var(--text-primary);background:var(--bg-active)}
+.fld-body{padding-bottom:4px}
+.fld-body.hidden{display:none}
+/* Divider between folder sections */
+.fld-sep{height:1px;background:var(--border);margin:6px 4px}
+/* Notes without folder (internal notes) */
+.fld-internal-label{
+  font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text-dim);padding:8px 8px 4px;
+  font-family:'Spectral',serif;
+}
+.ft-folder{
+  display:flex;align-items:center;gap:5px;
+  padding:4px 6px;border-radius:3px;cursor:pointer;
+  user-select:none;color:var(--text-muted);
+  font-size:11px;font-family:'Spectral',serif;
+  transition:color .1s,background .1s;
+}
+.ft-folder:hover{background:var(--bg-hover);color:var(--text-secondary)}
+.ft-arrow{
+  display:inline-block;font-size:8px;width:10px;
+  text-align:center;color:var(--text-dim);
+  transition:transform .14s;flex-shrink:0;
+}
+.ft-arrow.open{transform:rotate(90deg)}
+.ft-icon{font-size:11px;flex-shrink:0;opacity:.7}
+.ft-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.02em}
+.ft-children{display:none}
+.ft-children.open{display:block}
+.ft-note{
+  display:flex;align-items:center;
+  padding:3px 4px 3px 0;border-radius:3px;
+  cursor:pointer;transition:background .1s;
+  min-width:0;border-left:1.5px solid transparent;
+}
+.ft-note:hover{background:var(--bg-hover)}
+.ft-note.on{background:var(--bg-active);border-left-color:var(--accent)}
+.ft-note-title{
+  font-size:11px;font-family:'Spectral',serif;
+  color:var(--text-secondary);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  flex:1;min-width:0;
+}
+.ft-note.on .ft-note-title{color:var(--accent)}
+.ft-note-del{
+  opacity:0;font-size:10px;color:var(--text-dim);
+  cursor:pointer;padding:2px 5px;border-radius:2px;
+  border:none;background:transparent;font-family:inherit;
+  flex-shrink:0;line-height:1;transition:opacity .12s;
+}
+.ft-note:hover .ft-note-del{opacity:.35}
+.ft-note-del:hover{opacity:1!important;color:#c05050}
+
+/* ══════════════════════════════════════
+   EDITOR AREA
+   ══════════════════════════════════════ */
+#editor-area{flex:1;display:flex;overflow:hidden}
+#editor-pane,#preview-pane{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#editor-pane{border-right:1px solid var(--border)}
+#editor-pane.solo,#preview-pane.solo{border:none}
+#editor-pane.hidden,#preview-pane.hidden{display:none}
+
+/* Formatting toolbar */
+#editor-toolbar{
+  display:flex;align-items:center;gap:1px;
+  padding:4px 10px;
+  border-bottom:1px solid var(--border);
+  background:var(--bg-secondary);
+  flex-shrink:0;
+}
+#editor-toolbar.hidden{display:none}
+.tbtn{
+  padding:3px 8px;border-radius:3px;cursor:pointer;
+  border:none;background:transparent;
+  color:var(--text-muted);
+  font-size:11px;font-family:'Spectral',serif;
+  font-weight:500;letter-spacing:.02em;
+  transition:color .12s,background .12s;line-height:1.5;
+}
+.tbtn:hover{background:var(--bg-hover);color:var(--text-primary)}
+.tsep{width:1px;height:12px;background:var(--border);margin:0 3px;flex-shrink:0}
+
+/* ── Highlight editor (critical: no font-size changes in layer) ── */
+#editor-wrap{
+  flex:1;position:relative;
+  overflow:hidden;
+  background:var(--editor-bg);
+}
+#hl-layer{
+  position:absolute;top:0;left:0;right:0;
+  padding:var(--ed-pad-v) var(--ed-pad-h);
+  font-family:var(--ed-font);
+  font-size:var(--ed-size);
+  line-height:var(--ed-lh);
+  tab-size:2;white-space:pre-wrap;word-wrap:break-word;
+  overflow:hidden;pointer-events:none;z-index:1;
+  color:var(--sh-plain);will-change:transform;transform:translateY(0);
+}
+#editor{
+  position:absolute;inset:0;
+  padding:var(--ed-pad-v) var(--ed-pad-h);
+  font-family:var(--ed-font);
+  font-size:var(--ed-size);line-height:var(--ed-lh);
+  tab-size:2;background:transparent;color:transparent;
+  caret-color:var(--accent);-webkit-text-fill-color:transparent;
+  border:none;outline:none;resize:none;
+  overflow-y:scroll;overflow-x:hidden;
+  scrollbar-gutter:stable;white-space:pre-wrap;word-wrap:break-word;z-index:2;
+}
+#editor::selection{background:var(--selection)}
+.focus-mode #editor,.focus-mode #hl-layer{padding:48px calc(50% - 36ch)}
+.focus-mode #editor-toolbar{display:none!important}
+
+/* ── Preview ── */
+#preview-toolbar{
+  display:flex;align-items:center;justify-content:flex-end;
+  padding:5px 14px;
+  border-bottom:1px solid var(--border);
+  background:var(--bg-secondary);flex-shrink:0;
+  font-size:9px;color:var(--text-dim);
+  font-family:'Spectral',serif;letter-spacing:.1em;text-transform:uppercase;
+}
+#preview-toolbar.hidden{display:none}
+#preview{
+  flex:1;overflow-y:auto;
+  padding:40px 52px;
+  background:var(--preview-bg);
+  font-family:'Literata',Georgia,serif;
+  font-size:15.5px;line-height:1.88;
+  color:var(--text-primary);
+}
+#preview h1{
+  font-size:1.7em;margin:0 0 .6em;font-weight:300;
+  font-style:italic;
+  border-bottom:1px solid var(--border);padding-bottom:.4em;
+  color:var(--accent);letter-spacing:.01em;
+}
+#preview h2{font-size:1.25em;margin:1.8em 0 .5em;font-weight:400;letter-spacing:.01em}
+#preview h3{font-size:1.05em;margin:1.4em 0 .4em;font-weight:400;color:var(--text-secondary)}
+#preview h4{font-size:1em;margin:1.1em 0 .3em;font-weight:500;color:var(--text-muted)}
+#preview p{margin:0 0 .9em}
+#preview .spacer{height:.5em}
+#preview strong{font-weight:600}
+#preview em{font-style:italic;color:var(--text-secondary)}
+#preview del{opacity:.45;text-decoration:line-through}
+#preview a{color:var(--link);text-underline-offset:3px;text-decoration-thickness:1px}
+#preview blockquote{
+  border-left:2px solid var(--accent-dim);
+  padding:0 0 0 18px;color:var(--text-secondary);
+  margin:1.2em 0;font-style:italic;
+}
+#preview code{
+  background:var(--code-bg);padding:2px 7px;border-radius:2px;
+  font-family:'JetBrains Mono',monospace;font-size:.82em;color:var(--accent);
+}
+#preview pre{
+  background:var(--code-bg);border:1px solid var(--border);
+  border-radius:4px;padding:18px;overflow-x:auto;margin:1.2em 0;
+  border-left:2px solid var(--accent-dim);
+}
+#preview pre code{background:transparent;padding:0;font-size:.82em;color:var(--text-secondary)}
+#preview ul,#preview ol{padding-left:1.6em;margin:.6em 0 .9em}
+#preview li{margin-bottom:.25em}
+#preview hr{border:none;border-top:1px solid var(--border);margin:2em 0}
+#preview table{width:100%;border-collapse:collapse;margin:1.2em 0;font-size:.9em}
+#preview td,#preview th{border:1px solid var(--border);padding:8px 14px}
+#preview th{
+  background:var(--bg-secondary);font-weight:400;
+  font-family:'Spectral',serif;font-size:.85em;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);
+}
+/* Footnotes */
+#preview .fn-ref{
+  color:var(--accent);text-decoration:none;
+  font-size:.8em;font-family:'Spectral',serif;
+}
+#preview .fn-ref:hover{text-decoration:underline}
+#preview .fn-sep{margin:2.4em 0 1.2em;border-top:1px solid var(--border)}
+#preview .footnotes{font-size:.85em;color:var(--text-secondary)}
+#preview .footnotes ol{padding-left:1.4em}
+#preview .footnotes li{margin-bottom:.4em;line-height:1.6}
+#preview .fn-back{
+  color:var(--text-muted);text-decoration:none;
+  margin-left:4px;font-size:.9em;
+}
+#preview .fn-back:hover{color:var(--accent)}
+.wikilink{cursor:pointer}
+.wikilink-exists{color:var(--link);text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+.wikilink-missing{color:var(--text-muted);text-decoration:underline dashed;text-underline-offset:3px}
+.wikilink:hover{opacity:.75}
+
+/* ── Status bar ── */
+#statusbar{
+  display:flex;align-items:center;gap:10px;
+  padding:0 14px;height:22px;
+  background:var(--bg-secondary);
+  border-top:1px solid var(--border);
+  font-size:9px;font-family:'Spectral',serif;
+  color:var(--text-dim);letter-spacing:.06em;text-transform:uppercase;
+  flex-shrink:0;user-select:none;overflow:hidden;
+}
+.st-sep{width:1px;height:10px;background:var(--border);flex-shrink:0}
+.st-spacer{flex:1}
+
+/* ── Saved indicator ── */
+#st-saved{transition:color .3s}
+
+/* ══════════════════════════════════════
+   MODALS
+   ══════════════════════════════════════ */
+.overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.65);
+  display:flex;align-items:center;justify-content:center;
+  z-index:200;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+}
+.overlay.hidden{display:none}
+.modal{
+  background:var(--bg-secondary);
+  border:1px solid var(--border-med);
+  border-top:1.5px solid var(--accent);
+  border-radius:4px;padding:24px;
+  min-width:340px;max-width:92vw;
+  box-shadow:var(--shadow);
+}
+.modal h3{
+  font-size:10px;margin-bottom:16px;
+  color:var(--accent);font-weight:400;
+  letter-spacing:.12em;text-transform:uppercase;
+  font-family:'Spectral',serif;
+}
+.modal-input{
+  width:100%;background:var(--bg-primary);
+  border:1px solid var(--border);
+  border-radius:3px;padding:9px 12px;
+  color:var(--text-primary);font-size:13px;
+  font-family:'Spectral',serif;outline:none;
+  margin-bottom:14px;transition:border .15s;
+}
+.modal-input:focus{border-color:var(--accent)}
+.modal-row{display:flex;gap:8px;justify-content:flex-end}
+.btn{
+  padding:7px 16px;border-radius:3px;cursor:pointer;border:none;
+  font-size:10px;font-family:'Spectral',serif;
+  letter-spacing:.08em;text-transform:uppercase;transition:all .14s;
+}
+.btn-p{background:var(--accent);color:var(--bg-primary);font-weight:500}
+.btn-p:hover{opacity:.85}
+.btn-s{
+  background:transparent;color:var(--text-secondary);
+  border:1px solid var(--border-med);
+}
+.btn-s:hover{background:var(--bg-hover);color:var(--text-primary);border-color:var(--border-med)}
+
+/* Theme picker */
+.th-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.th-opt{
+  padding:11px 12px;border-radius:3px;cursor:pointer;
+  border:1px solid var(--border);
+  font-size:11px;letter-spacing:.03em;
+  font-family:'Spectral',serif;
+  transition:border .14s,background .14s;
+}
+.th-opt:hover{background:var(--bg-hover)}
+.th-opt.on{border-color:var(--accent)!important;background:var(--accent-glow)}
+.th-dots{display:flex;gap:4px;margin-top:6px}
+.th-dot{width:10px;height:10px;border-radius:50%}
+
+/* Export modal */
+.ex-opts{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.ex-opt{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 14px;border-radius:3px;cursor:pointer;
+  border:1px solid var(--border);
+  background:transparent;transition:border .13s,background .13s;
+}
+.ex-opt:hover{border-color:var(--accent-dim);background:var(--accent-glow)}
+.ex-opt-site{border-color:var(--accent-dim);background:var(--accent-glow)}
+.ex-ico{font-size:18px;flex-shrink:0;opacity:.8}
+.ex-lbl{font-size:12px;color:var(--text-primary);font-family:'Spectral',serif}
+.ex-dsc{font-size:10px;color:var(--text-muted);font-family:'Spectral',serif}
+/* ── Highlight editor ──
+   Architecture: editor-wrap is the scroll container. The textarea is
+   invisible (transparent text, transparent bg) and sits on top for input.
+   The hl-layer is underneath, positioned to match the textarea exactly.
+   CRITICAL RULE: hl-layer must NEVER change font-size, line-height, or any
+   metric that affects layout — only color, font-weight, font-style are safe.
+   The layer does NOT scroll; it is shifted via transform:translateY by JS.
+*/
+#editor-wrap{
+  flex:1;
+  position:relative;
+  overflow:hidden;           /* clips the shifted layer */
+  background:var(--editor-bg);
+}
+/* ── Responsive follows below ── */
+/* ══════════════════════════════════════════════════════════
+   RESPONSIVE — três breakpoints
+   desktop  : >1024px  — comportamento padrão intacto
+   tablet   : 640–1024px — sidebar colapsável, split ok
+   mobile   : <640px   — drawer overlay, view único, navbar compacta
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Drawer overlay (aparece só no mobile) ── */
+#sidebar-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.55);z-index:98;
+  backdrop-filter:blur(2px);
+  -webkit-backdrop-filter:blur(2px);
+}
+
+/* ── Tablet: 640–1024px ── */
+@media(max-width:1024px){
+  /* Esconde labels dos botões de ação, mantém ícones */
+  .tb-btn .btn-label{display:none}
+  /* Reduz padding da titlebar */
+  #titlebar{padding:0 6px;gap:2px}
+  .tb-btn{padding:4px 6px}
+  /* Preview padding menor */
+  #preview{padding:24px 28px}
+}
+
+/* ── Mobile: <640px ── */
+@media(max-width:639px){
+  /* Viewport fix para iOS/Android que não respeitam dvh corretamente */
+  #app{height:100svh;height:100dvh}
+
+  /* ── Titlebar: linha única com scroll horizontal ── */
+  #titlebar{
+    flex-wrap:nowrap;
+    height:38px;
+    padding:0 4px;
+    gap:1px;
+    overflow-x:auto;
+    overflow-y:hidden;
+  }
+  #titlebar::-webkit-scrollbar{display:none}
+  /* Logo menor */
+  .tb-logo{font-size:11px;letter-spacing:.03em}
+
+  /* Separadores somem */
+  .tb-sep{display:none}
+
+  /* ◎ Foco some no mobile */
+  #btn-focus{display:none}
+
+  /* ↓ᴬ Salvar Como some (ação rara no mobile) */
+  #btn-save-as{display:none}
+
+  /* Botões ficam menores */
+  .tb-btn{padding:3px 5px;font-size:10px;gap:1px}
+
+  /* Spacer empurra vm-grp + tema para a direita */
+  .tb-spacer{flex:1;min-width:4px}
+
+  /* View mode: mesma linha, compacto */
+  .vm-grp{
+    display:flex;
+    flex-shrink:0;
+    border-radius:3px;
+    overflow:hidden;
+  }
+  .vm-btn{
+    padding:3px 7px;
+    font-size:10px;
+    letter-spacing:.03em;
+  }
+  .vm-btn.on{background:var(--accent-glow);color:var(--accent)}
+
+  /* ── Tabs bar: rola horizontalmente ── */
+  #tabs-bar{min-height:28px}
+  .tab{height:28px;padding:0 8px;max-width:120px;font-size:10px}
+
+  /* ── Sidebar vira drawer overlay ── */
+  #sidebar{
+    position:fixed;
+    top:0; left:0; bottom:0;
+    z-index:99;
+    width:82vw!important;
+    max-width:300px;
+    transform:translateX(-100%);
+    transition:transform .22s ease, box-shadow .22s ease;
+    box-shadow:none;
+    border-right:1px solid var(--border);
+  }
+  #sidebar.open-mobile{
+    transform:translateX(0);
+    box-shadow:var(--shadow);
+  }
+  #sidebar.closed{
+    transform:translateX(-100%)!important;
+    width:82vw!important;
+  }
+
+  /* Overlay aparece quando sidebar está aberta */
+  #sidebar-overlay{display:block;opacity:0;pointer-events:none;transition:opacity .22s}
+  #sidebar.open-mobile~#sidebar-overlay,
+  body.sb-open #sidebar-overlay{opacity:1;pointer-events:auto}
+
+  /* ── Editor area: ocupa tudo ── */
+  #main{position:relative}
+  #editor-area{width:100%}
+
+  #editor-pane{flex:1}
+  #preview-pane{flex:1}
+
+  /* Editor: padding menor ── */
+  :root{--ed-pad-v:16px;--ed-pad-h:16px}
+
+  /* Preview: padding menor ── */
+  #preview{padding:18px 18px 80px}
+
+  /* ── Barra de status simplificada ── */
+  #statusbar{font-size:9px;padding:0 8px;gap:6px}
+  #st-chars,#st-links,#st-backlinks{display:none}
+  .st-sep:nth-of-type(n+3){display:none}
+
+  /* ── Bottom nav bar no mobile ── */
+  #mobile-nav{
+    display:flex;
+    background:var(--bg-secondary);
+    border-top:1px solid var(--border);
+    flex-shrink:0;
+  }
+  .mn-btn{
+    flex:1;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:2px;
+    padding:6px 0 5px;
+    border:none;background:transparent;
+    color:var(--text-muted);font-family:inherit;cursor:pointer;
+    font-size:8px;letter-spacing:.05em;text-transform:uppercase;
+    transition:color .15s;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .mn-btn .mn-ico{font-size:16px;line-height:1}
+  .mn-btn.on{color:var(--accent)}
+  .mn-btn:active{opacity:.7}
+}
+
+/* Desktop: bottom nav escondida */
+#mobile-nav{display:none}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+<div id="app">
+  <button id="install-bar">⬇ Instalar Askesis-Zettel como aplicativo — funciona offline</button>
+  <div id="titlebar">
+    <span class="tb-logo">Askesis<span>Zettel</span></span>
+    <div class="tb-sep"></div>
+    <button class="tb-btn on" id="btn-sidebar">☰</button>
+    <button class="tb-btn" id="btn-new">+ Nova</button>
+    <button class="tb-btn" id="btn-folder" title="Abrir pasta de notas">⊞ Pasta</button>
+    <button class="tb-btn" id="btn-open" title="Abrir arquivo(s) .md">↙ Abrir</button>
+    <button class="tb-btn" id="btn-save" title="Salvar nota atual">↓ Salvar</button>
+    <button class="tb-btn" id="btn-save-as" title="Salvar como...">↓ᴬ</button>
+    <button class="tb-btn" id="btn-export">↗ Exportar</button>
+    <input type="file" id="file-open-input" accept=".md,.markdown,.txt" style="display:none" multiple/>
+    <div class="tb-spacer"></div>
+    <div class="vm-grp">
+      <button class="vm-btn" data-vm="editor">Editor</button>
+      <button class="vm-btn on" data-vm="split">Split</button>
+      <button class="vm-btn" data-vm="preview">Preview</button>
+    </div>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" id="btn-focus">◎ Foco</button>
+    <button class="tb-btn" id="btn-theme">◑ Tema</button>
+  </div>
+  <div id="tabs-bar"><button id="tab-new">+</button></div>
+  <div id="sidebar-overlay"></div>
+  <div id="main">
+    <div id="sidebar">
+      <div id="sb-header">
+        <div class="sb-tab on" data-sb="explorer">Notas</div>
+        <div class="sb-tab" data-sb="backlinks">Links</div>
+        <div class="sb-tab" data-sb="outline">Índice</div>
+      </div>
+      <div id="sb-body">
+        <div id="folder-bar"><span id="folder-name">nenhuma pasta</span><button id="btn-folder-sync" title="Recarregar pasta">↺</button><button id="btn-folder-close" title="Fechar pasta">✕</button></div>
+        <div id="sb-search"><span class="search-ico">⌕</span><input type="text" placeholder="Buscar..." id="search-input"/></div>
+        <div id="sb-content"></div>
+      </div>
+    </div>
+    <div id="editor-area">
+      <div id="editor-pane">
+        <div id="editor-toolbar">
+          <button class="tbtn" data-fmt="bold">B</button>
+          <button class="tbtn" data-fmt="italic">I</button>
+          <button class="tbtn" data-fmt="strike">~~</button>
+          <div class="tsep"></div>
+          <button class="tbtn" data-fmt="h1">H1</button>
+          <button class="tbtn" data-fmt="h2">H2</button>
+          <button class="tbtn" data-fmt="h3">H3</button>
+          <div class="tsep"></div>
+          <button class="tbtn" data-fmt="quote">&gt;</button>
+          <button class="tbtn" data-fmt="hr">—</button>
+          <button class="tbtn" data-fmt="wiki">[[⇥]]</button>
+        </div>
+        <div id="editor-wrap">
+          <div id="hl-layer" aria-hidden="true"></div>
+          <textarea id="editor" spellcheck="false" placeholder="Comece a escrever..." autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+        </div>
+      </div>
+      <div id="preview-pane">
+        <div id="preview-toolbar">Preview</div>
+        <div id="preview"></div>
+      </div>
+    </div>
+  </div>
+  <nav id="mobile-nav">
+    <button class="mn-btn on" id="mn-notes"><span class="mn-ico">☰</span>Notas</button>
+    <button class="mn-btn" id="mn-editor"><span class="mn-ico">✏</span>Editor</button>
+    <button class="mn-btn" id="mn-preview"><span class="mn-ico">👁</span>Preview</button>
+    <button class="mn-btn" id="mn-save"><span class="mn-ico">↓</span>Salvar</button>
+    <button class="mn-btn" id="mn-more"><span class="mn-ico">⋯</span>Mais</button>
+  </nav>
+  <div id="statusbar">
+    <span id="st-id"></span><div class="st-sep"></div>
+    <span id="st-words">0 palavras</span><div class="st-sep"></div>
+    <span id="st-chars">0 chars</span><div class="st-sep"></div>
+    <span id="st-links">0 links</span><div class="st-sep"></div>
+    <span id="st-backlinks">0 backlinks</span><div class="st-sep"></div>
+    <span id="st-total">0 notas</span>
+    <div class="st-spacer"></div>
+    <span id="st-saved" style="color:var(--tag-text)">● salvo</span><div class="st-sep"></div>
+    <span id="st-date"></span>
+  </div>
+</div>
+
+<!-- Modal: Nova nota -->
+<div class="overlay hidden" id="modal-new">
+  <div class="modal">
+    <h3>Nova Nota</h3>
+    <input class="modal-input" id="new-note-input" type="text" placeholder="Título da nota..."/>
+    <div class="modal-row">
+      <button class="btn btn-s" id="btn-new-cancel">Cancelar</button>
+      <button class="btn btn-p" id="btn-new-confirm">Criar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Exportar -->
+<div class="overlay hidden" id="modal-export">
+  <div class="modal">
+    <h3 id="export-title">Exportar</h3>
+    <div class="ex-opts">
+      <div class="ex-opt" data-fmt="markdown"><span class="ex-ico">⬇</span><div><div class="ex-lbl">Markdown</div><div class="ex-dsc">.md — formato nativo</div></div></div>
+      <div class="ex-opt" data-fmt="html-latex"><span class="ex-ico">🏛</span><div><div class="ex-lbl">HTML — Latin Modern</div><div class="ex-dsc">.html — tipografia estilo LaTeX</div></div></div>
+      <div class="ex-opt" data-fmt="html"><span class="ex-ico">🌐</span><div><div class="ex-lbl">HTML — Simples</div><div class="ex-dsc">.html — página web com estilo básico</div></div></div>
+      <div class="ex-opt" data-fmt="pdf"><span class="ex-ico">📑</span><div><div class="ex-lbl">PDF — Latin Modern</div><div class="ex-dsc">Imprime via diálogo do navegador (A4)</div></div></div>
+      <div class="ex-opt" data-fmt="fodt"><span class="ex-ico">📝</span><div><div class="ex-lbl">Flat OpenDocument</div><div class="ex-dsc">.fodt — compatível com LibreOffice / Word</div></div></div>
+      <div class="ex-opt" data-fmt="rtf"><span class="ex-ico">📋</span><div><div class="ex-lbl">Rich Text Format</div><div class="ex-dsc">.rtf — compatível com Word, Pages, Writer</div></div></div>
+      <div class="ex-opt" data-fmt="text"><span class="ex-ico">📄</span><div><div class="ex-lbl">Texto Simples</div><div class="ex-dsc">.txt — sem formatação</div></div></div>
+      <div class="ex-opt ex-opt-site" data-fmt="site"><span class="ex-ico">🌐</span><div><div class="ex-lbl">Site HTML Completo — ZIP</div><div class="ex-dsc">Todas as notas como website interligado (Latin Modern)</div></div></div>
+    </div>
+    <div class="modal-row"><button class="btn btn-s" id="btn-export-close">Fechar</button></div>
+  </div>
+</div>
+
+<!-- Modal: Tema -->
+<div class="overlay hidden" id="modal-theme">
+  <div class="modal">
+    <h3>Tema Visual</h3>
+    <div class="th-grid" id="theme-grid"></div>
+    <div class="modal-row"><button class="btn btn-s" id="btn-theme-close">Fechar</button></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+//  THEMES
+// ══════════════════════════════════════════
+const THEMES={
+  "askesis-dark":{label:"Askesis Dark",vars:{"--bg-primary":"#0e0e0e","--bg-secondary":"#141414","--bg-tertiary":"#1c1c1c","--bg-hover":"#222","--bg-active":"#282828","--border":"#232323","--border-light":"#1c1c1c","--border-med":"#2d2d2d","--text-primary":"#e6e2da","--text-secondary":"#7a766e","--text-muted":"#3e3c38","--text-dim":"#2a2826","--accent":"#b8965a","--accent-dim":"#6b5330","--accent-glow":"rgba(184,150,90,.12)","--link":"#7aa8b8","--tag":"#1e1a12","--tag-text":"#9a7a48","--scrollbar":"#2a2826","--shadow":"0 16px 48px rgba(0,0,0,.8),0 4px 12px rgba(0,0,0,.5)","--shadow-sm":"0 4px 16px rgba(0,0,0,.5)","--editor-bg":"#0e0e0e","--preview-bg":"#111111","--code-bg":"#181818","--selection":"rgba(184,150,90,.18)","--sh-head":"#b8965a","--sh-bold":"#e6e2da","--sh-italic":"#9e9a92","--sh-code":"#7aa8b8","--sh-cb":"#6a8898","--sh-quote":"#524e48","--sh-link":"#7aa8b8","--sh-hr":"#282828","--sh-list":"#b8965a","--sh-fm":"#2e2c28","--sh-wiki":"#7aa8b8","--sh-plain":"#e6e2da"}},
+  "askesis-light":{label:"Askesis Light",vars:{"--bg-primary":"#f8f4ed","--bg-secondary":"#f0ece4","--bg-tertiary":"#e8e4db","--bg-hover":"#e0dcd2","--bg-active":"#d8d4c8","--border":"#d4cfc5","--border-light":"#dedad0","--border-med":"#c8c3b8","--text-primary":"#28261e","--text-secondary":"#6a6458","--text-muted":"#a8a49a","--text-dim":"#c8c4ba","--accent":"#8a6420","--accent-dim":"#b89060","--accent-glow":"rgba(138,100,32,.1)","--link":"#2a6e87","--tag":"#f0e8d0","--tag-text":"#7a5a10","--scrollbar":"#c8c3b8","--shadow":"0 8px 32px rgba(0,0,0,.12)","--shadow-sm":"0 4px 12px rgba(0,0,0,.08)","--editor-bg":"#faf6ef","--preview-bg":"#faf6ef","--code-bg":"#eee9df","--selection":"rgba(138,100,32,.14)","--sh-head":"#8a6420","--sh-bold":"#1a1810","--sh-italic":"#5a5040","--sh-code":"#2a6e87","--sh-cb":"#2a6e87","--sh-quote":"#9a9490","--sh-link":"#2a6e87","--sh-hr":"#c8c3b8","--sh-list":"#8a6420","--sh-fm":"#c0bbb0","--sh-wiki":"#2a6e87","--sh-plain":"#28261e"}},
+  "hc-dark":{label:"Alto Contraste Escuro",vars:{"--bg-primary":"#000","--bg-secondary":"#080808","--bg-tertiary":"#111","--bg-hover":"#1c1c1c","--bg-active":"#242424","--border":"#383838","--border-light":"#242424","--border-med":"#444","--text-primary":"#fff","--text-secondary":"#ccc","--text-muted":"#666","--text-dim":"#333","--accent":"#ffcc00","--accent-dim":"#7a6200","--accent-glow":"rgba(255,204,0,.12)","--link":"#66ccff","--tag":"#002800","--tag-text":"#66ff66","--scrollbar":"#333","--shadow":"0 8px 32px rgba(0,0,0,.95)","--shadow-sm":"0 4px 16px rgba(0,0,0,.8)","--editor-bg":"#000","--preview-bg":"#000","--code-bg":"#0c0c0c","--selection":"rgba(255,204,0,.25)","--sh-head":"#ffcc00","--sh-bold":"#ffffff","--sh-italic":"#ddddaa","--sh-code":"#66ccff","--sh-cb":"#66ccff","--sh-quote":"#888","--sh-link":"#66ccff","--sh-hr":"#333","--sh-list":"#ffcc00","--sh-fm":"#444","--sh-wiki":"#66ccff","--sh-plain":"#fff"}},
+  "hc-light":{label:"Alto Contraste Claro",vars:{"--bg-primary":"#fff","--bg-secondary":"#f0f0f0","--bg-tertiary":"#e0e0e0","--bg-hover":"#d0d0d0","--bg-active":"#c0c0c0","--border":"#000","--border-light":"#888","--border-med":"#666","--text-primary":"#000","--text-secondary":"#111","--text-muted":"#444","--text-dim":"#888","--accent":"#0033cc","--accent-dim":"#6688dd","--accent-glow":"rgba(0,51,204,.1)","--link":"#0000cc","--tag":"#e8ffe8","--tag-text":"#004400","--scrollbar":"#888","--shadow":"0 8px 32px rgba(0,0,0,.3)","--shadow-sm":"0 4px 12px rgba(0,0,0,.2)","--editor-bg":"#fff","--preview-bg":"#fff","--code-bg":"#eee","--selection":"rgba(0,51,204,.15)","--sh-head":"#0033cc","--sh-bold":"#000","--sh-italic":"#333","--sh-code":"#0000cc","--sh-cb":"#0000cc","--sh-quote":"#555","--sh-link":"#0000cc","--sh-hr":"#888","--sh-list":"#0033cc","--sh-fm":"#aaa","--sh-wiki":"#0000cc","--sh-plain":"#000"}},
+  "nord":{label:"Nord Calm",vars:{"--bg-primary":"#2e3440","--bg-secondary":"#282e3c","--bg-tertiary":"#232934","--bg-hover":"#3b4252","--bg-active":"#434c5e","--border":"#3b4252","--border-light":"#2e3440","--border-med":"#4c566a","--text-primary":"#d8dee9","--text-secondary":"#9aa4b8","--text-muted":"#555e72","--text-dim":"#404858","--accent":"#88c0d0","--accent-dim":"#4c7a8a","--accent-glow":"rgba(136,192,208,.1)","--link":"#81a1c1","--tag":"#2a3828","--tag-text":"#a3be8c","--scrollbar":"#3b4252","--shadow":"0 8px 32px rgba(0,0,0,.5)","--shadow-sm":"0 4px 16px rgba(0,0,0,.4)","--editor-bg":"#2a3040","--preview-bg":"#2a3040","--code-bg":"#232934","--selection":"rgba(136,192,208,.2)","--sh-head":"#88c0d0","--sh-bold":"#eceff4","--sh-italic":"#a3aec0","--sh-code":"#81a1c1","--sh-cb":"#81a1c1","--sh-quote":"#677080","--sh-link":"#81a1c1","--sh-hr":"#3b4252","--sh-list":"#88c0d0","--sh-fm":"#404858","--sh-wiki":"#81a1c1","--sh-plain":"#d8dee9"}},
+  "solarized":{label:"Solarized Warm",vars:{"--bg-primary":"#fdf6e3","--bg-secondary":"#f5eed4","--bg-tertiary":"#ede6cb","--bg-hover":"#e5ddbf","--bg-active":"#ddd6b5","--border":"#d0c9a8","--border-light":"#e5ddbf","--border-med":"#c0b898","--text-primary":"#586e75","--text-secondary":"#839496","--text-muted":"#b8c0bb","--text-dim":"#c8cfcc","--accent":"#cb4b16","--accent-dim":"#d3956a","--accent-glow":"rgba(203,75,22,.1)","--link":"#268bd2","--tag":"#f0f8e0","--tag-text":"#859900","--scrollbar":"#d0c9a8","--shadow":"0 8px 32px rgba(0,0,0,.1)","--shadow-sm":"0 4px 12px rgba(0,0,0,.08)","--editor-bg":"#fdf6e3","--preview-bg":"#fdf6e3","--code-bg":"#eee8d5","--selection":"rgba(203,75,22,.12)","--sh-head":"#cb4b16","--sh-bold":"#073642","--sh-italic":"#6c7a7c","--sh-code":"#268bd2","--sh-cb":"#268bd2","--sh-quote":"#93a1a1","--sh-link":"#268bd2","--sh-hr":"#c0bba0","--sh-list":"#cb4b16","--sh-fm":"#c0bba0","--sh-wiki":"#268bd2","--sh-plain":"#586e75"}},
+};
+
+// ══════════════════════════════════════════
+//  DEFAULT NOTES
+// ══════════════════════════════════════════
+const DN=[
+  {id:"202605151000",title:"Bem-vindo ao Askesis-Zettel",filename:"Bem-vindo ao Askesis-Zettel.md",tags:["início","guia"],created:"2026-05-15",updated:"2026-05-15",content:"---\ntitle: Bem-vindo ao Askesis-Zettel\ntags: [início, guia]\n---\n\n# Bem-vindo ao Askesis-Zettel\n\n> *\"Um ambiente cognitivo de permanência.\"*\n\nO **Askesis-Zettel** é um editor Markdown local-first com sistema [[Zettelkasten]] integrado, desenvolvido pelo projeto **Askesis** — uma iniciativa de humanidades digitais sediada em [askesis.hypotheses.org](https://askesis.hypotheses.org).[^1]\n\nTodas as suas notas ficam salvas localmente no seu dispositivo. Nenhum dado é enviado a servidores externos.\n\n---\n\n## Criar e editar notas\n\n- Clique em **+ Nova** (barra superior) para criar uma nota\n- Digite em Markdown no painel esquerdo — o preview aparece à direita em tempo real\n- Use **Ctrl+S** (ou ⌘S no Mac) para salvar em arquivo\n\n---\n\n## Abrir pastas\n\nClique em **⊞ Pasta** para vincular uma pasta do seu computador.[^2] Todos os arquivos `.md` da pasta e subpastas aparecem na coluna esquerda como uma árvore navegável. Você pode abrir **múltiplas pastas** simultaneamente — cada uma aparece como uma seção separada na barra lateral.\n\n---\n\n## Links entre notas\n\nUse `[[título]]` para criar um link para outra nota:\n\n- [[Zettelkasten]] — exemplo de link para a nota de referência\n- [[Filosofia do Estudo]] — outra nota incluída\n- Links em azul → nota existe; links tracejados → nota ainda não existe\n\n---\n\n## Exportar uma nota\n\nClique em **↗** para exportar a nota atual em:\n\n| Formato | Descrição |\n|---|---|\n| Markdown | `.md` padrão |\n| HTML (Latin Modern) | página com tipografia LaTeX |\n| PDF | via diálogo de impressão |\n| ODT | para LibreOffice/Word |\n| RTF | formato universal de texto |\n| Texto simples | `.txt` sem formatação |\n\n---\n\n## Exportar site HTML completo — ZIP\n\nEsta é a funcionalidade mais poderosa do Askesis-Zettel. Clique em **↗ → Site HTML (ZIP)** para exportar **todas as notas como um website interligado**.\n\nO arquivo `.zip` gerado contém:\n\n- `index.html` — página inicial com lista de notas e busca\n- `style.css` — tipografia Latin Modern embutida (funciona offline)\n- `{nota}.html` — uma página por nota, com links funcionando\n- `tag-{palavra}.html` — uma página por palavra-chave\n\n### Links automáticos\n\nNo site exportado, dois tipos de link são gerados automaticamente:\n\n1. **`[[wikilinks]]` explícitos** — viram `<a href=\"nota.html\">` clicáveis (link azul sólido)\n2. **Títulos de notas no texto** — qualquer ocorrência de um título de nota no corpo do texto é automaticamente convertida em link (link azul pontilhado)\n\nPor exemplo, se você tem uma nota chamada \"Estoicismo\" e escreve em outra nota: *\"O Estoicismo ensina que...\"*, a palavra \"Estoicismo\" vira link automaticamente — sem precisar escrever `[[Estoicismo]]`.\n\n### Palavras-chave como páginas\n\nCada **tag** vira uma página no site (`tag-filosofia.html`) que lista todas as notas com aquela palavra-chave. No índice, as tags aparecem como nuvem clicável ordenada por frequência.\n\n### Personalizando o índice com `_index.md`\n\nCrie uma nota chamada `_index` na sua pasta para personalizar a página inicial do site. Ela usa frontmatter YAML e corpo em Markdown:\n\n```\n---\ntitle: Meu Zettelkasten\ndescription: Notas de pesquisa sobre filosofia\nauthor: Seu Nome\n---\n\nTexto de introdução que aparece antes da lista de notas.\nPode conter [[links]] para outras notas.\n```\n\nA nota `_index` **não é exportada como página separada** — apenas configura o `index.html`. Os campos YAML disponíveis são: `title`, `description`, `author`.\n\n---\n\n## Sintaxe Markdown suportada\n\n| Sintaxe | Resultado |\n|---|---|\n| `**texto**` | **negrito** |\n| `*texto*` | *itálico* |\n| `# Título` | Cabeçalho H1–H6 |\n| `[[nota]]` | Link Zettelkasten |\n| `[^1]` | Nota de rodapé[^3] |\n| ` ``` ` | Bloco de código |\n| `> texto` | Citação |\n| `- item` | Lista |\n| `| col |` | Tabela |\n\n---\n\n## Temas\n\nClique em **◑** para escolher entre 6 temas visuais: Askesis Light, Askesis Dark, Alto Contraste (claro/escuro), Nord e Solarized.\n\n---\n\n[^1]: Askesis é um projeto de pesquisa e desenvolvimento de ferramentas digitais para humanidades. Visite [askesis.hypotheses.org](https://askesis.hypotheses.org) para mais informações.\n[^2]: Requer navegador Chromium-based (Chrome, Edge, Brave). No Firefox, use o botão Abrir para carregar arquivos individualmente.\n[^3]: As notas de rodapé aparecem ao final do documento no preview e nas exportações HTML/PDF.\n"},
+  {id:"202605151001",title:"Zettelkasten",filename:"Zettelkasten.md",tags:["método","conhecimento"],created:"2026-05-15",updated:"2026-05-15",content:"---\ntitle: Zettelkasten\ntags: [método, conhecimento]\n---\n\n# Zettelkasten\n\nO **Zettelkasten** é um método de gestão do conhecimento desenvolvido pelo sociólogo Niklas Luhmann, que produziu mais de 70 livros e 400 artigos académicos usando um sistema de fichas interligadas.[^1]\n\n## Princípios\n\n1. **Atomicidade** — uma ideia por nota\n2. **Autonomia** — cada nota compreensível por si mesma\n3. **Conexão** — notas ligadas entre si via referências\n4. **Indexação** — pontos de entrada organizados\n\n## No Askesis-Zettel\n\nUse `[[título]]` para criar links entre notas. Veja [[Bem-vindo ao Askesis-Zettel]] para instruções completas.\n\n## Referências\n\n- Luhmann, N. *Kommunikation mit Zettelkästen* (1981)\n- Ahrens, S. *How to Take Smart Notes* (2017)\n\n[^1]: Luhmann manteve seu Zettelkasten físico com mais de 90.000 fichas ao longo de 40 anos de trabalho.\n"},
+  {id:"202605151002",title:"Filosofia do Estudo",filename:"Filosofia do Estudo.md",tags:["filosofia","estudo"],created:"2026-05-15",updated:"2026-05-15",content:"---\ntitle: Filosofia do Estudo\ntags: [filosofia, estudo]\n---\n\n# Filosofia do Estudo\n\n> *\"Não basta acumular informação — é preciso cultivar compreensão.\"*\n\n## Estudo como Askesis\n\n*Askesis* (ἄσκησις) — prática disciplinada, exercício espiritual.\n\n- requer **quietude**\n- exige **presença**\n- produz **transformação**\n\n## Conexão com [[Zettelkasten]]\n\nAo externalizar conexões, liberamos memória de trabalho para pensar com mais profundidade.\n\n---\n\n*\"A mente não é um recipiente a ser preenchido, mas um fogo a ser aceso.\"* — Plutarco\n"},
+];
+
+// ══════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════
+let notes=(() => { try{const s=localStorage.getItem("askesis-notes");return s?JSON.parse(s):DN;}catch{return DN;} })();
+let currentTheme=localStorage.getItem("askesis-theme")||"askesis-light";
+let tabs=[{noteId:notes[0]?.id||""}];
+let activeTab=0;
+let viewMode="split";
+let sidebarMode="explorer";
+let sidebarOpen=true;
+let focusMode=false;
+let searchQuery="";
+let installPromptEvent=null;
+
+// File System handles: noteId → FileSystemFileHandle
+const fileHandles={};
+// ── Multi-folder state ──────────────────────────────────────
+// Each open folder is stored in openFolders[] by insertion order.
+// openFolders[i] = {
+//   id: string (unique, e.g. "f0","f1",...),
+//   handle: DirectoryHandle,
+//   name: string,
+//   tree: node,              // same structure as before
+//   fileHandles: {},         // relPath → FSFileHandle  (local to this folder)
+//   titleIndex: {},          // title.toLowerCase() → relPath
+//   collapsed: Set,          // collapsed sub-paths
+//   headerCollapsed: bool,   // whether this folder's section is collapsed in sidebar
+// }
+const openFolders=[];
+let _folderSeq=0; // monotonic ID generator
+
+// Compatibility accessors (used by saveNoteToFile, hasFh, etc.)
+// Merges all open folders into flat maps — last-write wins on collision.
+function _allFileHandles(){
+  const m={};
+  for(const f of openFolders) Object.assign(m,f.fileHandles);
+  return m;
+}
+function _allTitleIndex(){
+  const m={};
+  for(const f of openFolders) Object.assign(m,f.titleIndex);
+  return m;
+}
+
+// ══════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════
+function genId(){const n=new Date();return n.getFullYear()+String(n.getMonth()+1).padStart(2,"0")+String(n.getDate()).padStart(2,"0")+String(n.getHours()).padStart(2,"0")+String(n.getMinutes()).padStart(2,"0");}
+function tod(){return new Date().toISOString().slice(0,10);}
+function save(){try{localStorage.setItem("askesis-notes",JSON.stringify(notes));}catch{}}
+function curNote(){return notes.find(n=>n.id===tabs[activeTab]?.noteId);}
+function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function slugify(t){return t.replace(/\s+/g,"-").replace(/[^\w\-]/g,"");}
+
+function setSaved(ok,msg){
+  const el=document.getElementById("st-saved");
+  el.textContent=ok?"● salvo":(msg||"● não salvo");
+  el.style.color=ok?"var(--tag-text)":"#e05050";
+}
+
+// ══════════════════════════════════════════
+//  MARKDOWN RENDERER (for preview & export)
+// ══════════════════════════════════════════
+function inline(text){
+  let t=esc(text);
+  // Footnote references: [^1] → superscript link
+  t=t.replace(/\[\^([^\]]+)\]/g,(_,id)=>
+    `<sup><a href="#fn-${esc(id)}" id="fnref-${esc(id)}" class="fn-ref">[${esc(id)}]</a></sup>`
+  );
+  t=t.replace(/\[\[([^\]]+)\]\]/g,(_,title)=>{
+    const f=notes.find(n=>n.title.toLowerCase()===title.toLowerCase());
+    return `<span class="wikilink ${f?"wikilink-exists":"wikilink-missing"}" data-noteid="${f?f.id:""}" data-title="${title}">${title}</span>`;
+  });
+  t=t.replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>");
+  t=t.replace(/__(.+?)__/g,"<strong>$1</strong>");
+  t=t.replace(/\*(.+?)\*/g,"<em>$1</em>");
+  t=t.replace(/_(.+?)_/g,"<em>$1</em>");
+  t=t.replace(/~~(.+?)~~/g,"<del>$1</del>");
+  t=t.replace(/`([^`]+)`/g,"<code>$1</code>");
+  t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+  return t;
+}
+
+// Parse YAML frontmatter — returns raw block as string (not rendered)
+// Used only by export functions that need metadata, not by the preview renderer.
+function parseFrontmatter(text){
+  if(!text.startsWith("---\n")) return null;
+  const end=text.indexOf("\n---\n",4);
+  if(end===-1) return null;
+  const block=text.slice(4,end);
+  const out={};
+  for(const line of block.split("\n")){
+    const m=line.match(/^([^:#]+):\s*(.*)$/);
+    if(!m) continue;
+    const key=m[1].trim(), val=m[2].trim();
+    if(val.startsWith("[")){
+      out[key]=val.slice(1,-1).split(",").map(s=>s.trim().replace(/^['"]|['"]$/g,""));
+    } else {
+      out[key]=val.replace(/^['"]|['"]$/g,"");
+    }
+  }
+  return Object.keys(out).length?out:null;
+}
+
+function md(text){
+  if(!text) return "";
+  const lines=text.split("\n");
+  let html="",inCode=false,codeLang="",codeBuf=[],inTable=false,tableBuf=[],stack=[],inFM=false,i=0;
+  const footnotes={};
+  const flushList=()=>{while(stack.length)html+=`</${stack.pop()}>`};
+  const flushTable=()=>{
+    if(!tableBuf.length)return;
+    let o="<table><thead><tr>";
+    tableBuf[0].split("|").filter(c=>c.trim()).forEach(h=>o+=`<th>${inline(h.trim())}</th>`);
+    o+="</tr></thead><tbody>";
+    for(let r=2;r<tableBuf.length;r++){o+="<tr>";tableBuf[r].split("|").filter(c=>c.trim()).forEach(c=>o+=`<td>${inline(c.trim())}</td>`);o+="</tr>";}
+    o+="</tbody></table>";html+=o;tableBuf=[];inTable=false;
+  };
+  while(i<lines.length){
+    const l=lines[i];
+    // YAML frontmatter: skip entirely (not rendered in preview)
+    if(i===0&&l==="---"){inFM=true;i++;continue;}
+    if(inFM&&l==="---"){inFM=false;i++;continue;}
+    if(inFM){i++;continue;}
+    if(l.startsWith("```")){
+      if(!inCode){flushList();flushTable();inCode=true;codeLang=l.slice(3).trim();codeBuf=[];}
+      else{html+=`<pre><code class="lang-${codeLang}">${codeBuf.map(esc).join("\n")}</code></pre>`;inCode=false;codeBuf=[];}
+      i++;continue;
+    }
+    if(inCode){codeBuf.push(l);i++;continue;}
+    const fnDef=l.match(/^\[\^([^\]]+)\]:\s*(.+)/);
+    if(fnDef){footnotes[fnDef[1]]=fnDef[2];i++;continue;}
+    if(l.includes("|")&&!l.match(/^#{1,6}\s/)){inTable=true;tableBuf.push(l);i++;continue;}
+    if(inTable&&!l.includes("|"))flushTable();
+    const hm=l.match(/^(#{1,6})\s+(.+)/);
+    if(hm){flushList();html+=`<h${hm[1].length}>${inline(hm[2])}</h${hm[1].length}>`;i++;continue;}
+    if(/^-{3,}$/.test(l.trim())){flushList();html+="<hr>";i++;continue;}
+    if(l.startsWith("> ")){flushList();html+=`<blockquote>${inline(l.slice(2))}</blockquote>`;i++;continue;}
+    const ulm=l.match(/^(\s*)[-*+]\s+(.+)/);
+    if(ulm){const d=Math.floor(ulm[1].length/2);while(stack.length>d+1)html+=`</${stack.pop()}>`;if(stack.length<=d){html+="<ul>";stack.push("ul");}html+=`<li>${inline(ulm[2])}</li>`;i++;continue;}
+    const olm=l.match(/^(\s*)\d+\.\s+(.+)/);
+    if(olm){const d=Math.floor(olm[1].length/2);while(stack.length>d+1)html+=`</${stack.pop()}>`;if(stack.length<=d){html+="<ol>";stack.push("ol");}html+=`<li>${inline(olm[2])}</li>`;i++;continue;}
+    if(l.trim()===""){flushList();if(!inTable)html+=`<div class="spacer"></div>`;i++;continue;}
+    flushList();html+=`<p>${inline(l)}</p>`;i++;
+  }
+  flushList();flushTable();
+  if(Object.keys(footnotes).length){
+    html+=`<hr class="fn-sep"><section class="footnotes"><ol>`;
+    for(const [id,def] of Object.entries(footnotes)){
+      html+=`<li id="fn-${esc(id)}">${inline(def)} <a href="#fnref-${esc(id)}" class="fn-back">↩</a></li>`;
+    }
+    html+=`</ol></section>`;
+  }
+  return html;
+}
+
+// ══════════════════════════════════════════
+//  SYNTAX HIGHLIGHT (editor layer)
+//  RULE: NEVER change font-size or line-height — only color/weight/style.
+//  Any metric change would break textarea↔layer line alignment.
+// ══════════════════════════════════════════
+// ══════════════════════════════════════════
+//  SYNTAX HIGHLIGHT
+//  Rules: NEVER change font-size/line-height — only color/weight/style.
+//  Performance: hlInline uses regex (not char loop); hlMd is incremental
+//  (only re-renders changed lines, reuses cached HTML for the rest).
+// ══════════════════════════════════════════
+
+// Pre-escape helper
+const _he=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+// hlInline: regex-based inline highlight.
+// IMPORTANT: patterns run on HTML-escaped text, so * _ ~ are literal.
+// Each pattern uses a negated character class [^X] to prevent crossing
+// the closing delimiter — this correctly handles multiple tokens per line.
+function hlInline(raw){
+  let t=_he(raw);
+  // [[wikilink]] — must run before [link](url) to avoid partial matches
+  t=t.replace(/\[\[([^\]]+)\]\]/g,
+    (_,m)=>`<span style="color:var(--sh-wiki)">[[${m}]]</span>`);
+  // `code` — run early so content inside is not further processed
+  t=t.replace(/`([^`\n]+)`/g,
+    (_,m)=>`<span style="color:var(--sh-code)">\`${m}\`</span>`);
+  // **bold** — [^*\n]+ prevents crossing newline or another **
+  t=t.replace(/\*\*([^*\n]+?)\*\*/g,
+    (_,m)=>`<span style="color:var(--sh-bold);font-weight:700">**${m}**</span>`);
+  // __bold__ — [^_\n]+ prevents crossing __
+  t=t.replace(/__([^_\n]+?)__/g,
+    (_,m)=>`<span style="color:var(--sh-bold);font-weight:700">__${m}__</span>`);
+  // ~~strike~~ — [^~\n]+
+  t=t.replace(/~~([^~\n]+?)~~/g,
+    (_,m)=>`<span style="color:var(--sh-quote);text-decoration:line-through">~~${m}~~</span>`);
+  // *italic* — must not start with * (would be **bold**) and not cross newline
+  // Use negative lookbehind (?<!\*) and negative lookahead (?!\*)
+  t=t.replace(/(?<!\*)\*([^*\n]+?)\*(?!\*)/g,
+    (_,m)=>`<span style="color:var(--sh-italic);font-style:italic">*${m}*</span>`);
+  // _italic_ — must not start/end with _ (would be __bold__)
+  t=t.replace(/(?<!_)_([^_\n]+?)_(?!_)/g,
+    (_,m)=>`<span style="color:var(--sh-italic);font-style:italic">_${m}_</span>`);
+  // [text](url)
+  t=t.replace(/\[([^\]\n]+)\]\(([^)\n]+)\)/g,
+    (_,txt,url)=>`<span style="color:var(--sh-link)">[${txt}](${url})</span>`);
+  // [^footnote]
+  t=t.replace(/\[\^([^\]\n]+)\]/g,
+    (_,id)=>`<span style="color:var(--sh-code)">[^${id}]</span>`);
+  return t;
+}
+
+// ── Incremental line cache ──────────────────────────────────
+// Stores {raw, html} per line index. On each keystroke we:
+//  1. Split new text into lines
+//  2. Find which lines changed (diff against previous split)
+//  3. Re-render only changed lines + their context (±1 for state propagation)
+//  4. Join all cached HTML
+// This makes typing in a 1000-line doc as fast as a 10-line doc.
+let _hlCache=[];   // [{raw,html}]
+let _hlLines=[];   // previous raw lines array
+
+function _hlOneLine(l, i, lines){
+  // Returns rendered HTML for a single line given its context.
+  // Context needed: inCode and inFM state must be computed from lines above.
+  // Caller ensures this by recomputing from scratch for dirty ranges.
+  // (State is cheap — it's just two booleans tracked per line.)
+  const he=_he;
+  // heading
+  const hm=l.match(/^(#{1,6})(\s+.*)$/);
+  if(hm) return `<span style="color:var(--sh-fm)">${he(hm[1])}</span><span style="color:var(--sh-head);font-weight:700">${hlInline(hm[2])}</span>`;
+  // hr
+  if(/^(-{3,}|\*{3,}|_{3,})$/.test(l.trim())) return `<span style="color:var(--sh-hr)">${he(l)}</span>`;
+  // blockquote
+  if(l.startsWith("> ")) return `<span style="color:var(--sh-quote)">&gt; </span><span style="color:var(--sh-quote);font-style:italic">${hlInline(l.slice(2))}</span>`;
+  // ul
+  const ulm=l.match(/^(\s*)([-*+])(\s+)(.*)$/);
+  if(ulm) return `${he(ulm[1])}<span style="color:var(--sh-list)">${he(ulm[2])}</span>${he(ulm[3])}${hlInline(ulm[4])}`;
+  // ol
+  const olm=l.match(/^(\s*)(\d+\.)(\s+)(.*)$/);
+  if(olm) return `${he(olm[1])}<span style="color:var(--sh-list)">${he(olm[2])}</span>${he(olm[3])}${hlInline(olm[4])}`;
+  // table
+  if(l.includes("|")){
+    return l.split("|").map((cell,ci,arr)=>{
+      const isDivider=/^[\s:|-]+$/.test(cell.trim())&&cell.includes("-");
+      const pipe=ci<arr.length-1?`<span style="color:var(--sh-list)">|</span>`:"";
+      return (isDivider?`<span style="color:var(--sh-hr)">${he(cell)}</span>`:hlInline(cell))+pipe;
+    }).join("");
+  }
+  return hlInline(l);
+}
+
+function hlMd(text){
+  if(!text) return "";
+  const newLines=text.split("\n");
+  const n=newLines.length;
+
+  // Grow/shrink cache to match
+  while(_hlCache.length<n) _hlCache.push(null);
+  _hlCache.length=n;
+
+  // Compute per-line state (inFM, inCode) from scratch — cheap, O(n) but
+  // just booleans, no string work. Needed to know which lines are "special".
+  // We store the state *entering* each line so we can detect context changes.
+  const stateIn=new Array(n+1);
+  stateIn[0]={fm:false,code:false};
+  for(let i=0;i<n;i++){
+    let {fm,code}=stateIn[i];
+    const l=newLines[i];
+    if(i===0&&l==="---"){stateIn[i+1]={fm:true,code};continue;}
+    if(fm&&l==="---"){stateIn[i+1]={fm:false,code};continue;}
+    if(!fm&&l.startsWith("```")){stateIn[i+1]={fm,code:!code};continue;}
+    stateIn[i+1]={fm,code};
+  }
+
+  // Mark dirty lines: changed raw text OR changed entering state
+  const dirty=new Uint8Array(n);
+  for(let i=0;i<n;i++){
+    const prev=_hlCache[i];
+    if(!prev||prev.raw!==newLines[i]) dirty[i]=1;
+    // State change invalidates this line even if text didn't change
+    if(i>0){
+      const ps=_hlCache[i]?._stateIn;
+      const cs=stateIn[i];
+      if(!ps||ps.fm!==cs.fm||ps.code!==cs.code) dirty[i]=1;
+    }
+  }
+
+  // Render dirty lines
+  for(let i=0;i<n;i++){
+    if(!dirty[i]) continue;
+    const l=newLines[i];
+    const {fm,code}=stateIn[i];
+    let html;
+    if(i===0&&l==="---")          html=`<span style="color:var(--sh-fm)">${_he(l)}</span>`;
+    else if(fm)                    html=`<span style="color:var(--sh-fm)">${_he(l)}</span>`;
+    else if(l.startsWith("```"))  html=`<span style="color:var(--sh-cb)">${_he(l)}</span>`;
+    else if(code)                  html=`<span style="color:var(--sh-cb)">${_he(l)}</span>`;
+    else                           html=_hlOneLine(l,i,newLines);
+    _hlCache[i]={raw:l,html,_stateIn:stateIn[i]};
+  }
+
+  _hlLines=newLines;
+  return _hlCache.map(c=>c?c.html:"").join("\n")+"\n";
+}
+
+// Invalidate cache when switching notes (different content, stale cache)
+function _hlCacheReset(){ _hlCache=[]; _hlLines=[]; }
+
+// ══════════════════════════════════════════
+//  EXPORT — Latin Modern CSS
+// ══════════════════════════════════════════
+const LATEX_CSS=`
+@font-face{font-family:'Latin Modern';font-style:normal;font-weight:normal;src:url('https://latex.now.sh/fonts/LM-regular.woff2') format('woff2'),url('https://latex.now.sh/fonts/LM-regular.woff') format('woff')}
+@font-face{font-family:'Latin Modern';font-style:italic;font-weight:normal;src:url('https://latex.now.sh/fonts/LM-italic.woff2') format('woff2'),url('https://latex.now.sh/fonts/LM-italic.woff') format('woff')}
+@font-face{font-family:'Latin Modern';font-style:normal;font-weight:bold;src:url('https://latex.now.sh/fonts/LM-bold.woff2') format('woff2'),url('https://latex.now.sh/fonts/LM-bold.woff') format('woff')}
+@font-face{font-family:'Latin Modern';font-style:italic;font-weight:bold;src:url('https://latex.now.sh/fonts/LM-bold-italic.woff2') format('woff2'),url('https://latex.now.sh/fonts/LM-bold-italic.woff') format('woff')}
+html{font-size:1rem;scroll-behavior:smooth}
+body{font-family:'Latin Modern',Georgia,'Times New Roman',serif;max-width:48em;margin:4em auto;padding:0 2em;line-height:1.8;color:#111}
+h1,h2,h3,h4{font-family:'Latin Modern',Georgia,serif;font-weight:normal;margin-top:2em;margin-bottom:.5em}
+h1{font-size:2em;text-align:center;border-bottom:1px solid #ccc;padding-bottom:.4em;margin-top:1em}
+h2{font-size:1.4em}h3{font-size:1.15em}h4{font-size:1em;font-weight:bold}
+p{text-align:justify;hyphens:auto;margin:.8em 0;font-size:1.05em}
+a,a:visited{color:#0070b7;text-decoration:none}
+a:hover{color:#d86d4e;text-decoration:underline}
+blockquote{margin:1.2em 2em;padding:.8em 1.2em;font-size:95%;line-height:1.6;color:#555;border-left:4px solid #b8965a;background:#fdfaf5}
+code{font-family:'Courier New',monospace;font-size:.88em;background:#f3f0e8;padding:2px 5px;border-radius:3px}
+pre{background:#f3f0e8;border:1px solid #ddd;border-radius:4px;padding:1.2em;overflow-x:auto;margin:1.2em 0}
+pre code{background:transparent;padding:0}
+ul,ol{padding-left:2em;margin:.6em 0;font-size:1.05em;line-height:1.6}
+li{margin-bottom:.3em}
+hr{border:none;border-top:1px solid #ccc;margin:2em 0}
+table{width:100%;border-collapse:collapse;margin:1.2em 0;font-size:.95em}
+td,th{border:1px solid #ccc;padding:.5em .9em}
+th{background:#f5f0e8;font-weight:bold}
+.wikilink-exists{color:#0070b7;text-decoration:underline}
+.wikilink-missing{color:#aaa;text-decoration:underline dashed}
+del{opacity:.5;text-decoration:line-through}
+.spacer{height:.6em}
+@media print{
+  body{margin:0;padding:1cm;max-width:100%}
+  a{color:#000;text-decoration:none}
+  pre{white-space:pre-wrap}
+}
+@page{size:A4;margin:2.5cm 2cm 2.5cm 2.5cm}
+`;
+
+function buildLatexHtml(note){
+  const bodyHtml=md(note.content);
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>${note.title}</title>
+<style>${LATEX_CSS}</style>
+</head>
+<body>
+${bodyHtml}
+</body>
+</html>`;
+}
+
+function mdToPlain(content){
+  return content
+    .replace(/^---[\s\S]*?---\n/,"")
+    .replace(/#{1,6}\s+/g,"")
+    .replace(/\*\*(.+?)\*\*/g,"$1")
+    .replace(/\*(.+?)\*/g,"$1")
+    .replace(/`(.+?)`/g,"$1")
+    .replace(/\[\[(.+?)\]\]/g,"$1")
+    .replace(/\[(.+?)\]\(.+?\)/g,"$1");
+}
+function mdToFodt(note){
+  const plain=mdToPlain(note.content);
+  const lines=plain.split("\n");
+  let body="";
+  for(const l of lines){
+    const t=l.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    if(!t.trim()){body+=`<text:p text:style-name="Text_20_Body"/>`;continue;}
+    body+=`<text:p text:style-name="Text_20_Body">${t}</text:p>`;
+  }
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+  xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+  xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
+  office:mimetype="application/vnd.oasis.opendocument.text"
+  office:version="1.3">
+<office:styles>
+  <style:style style:name="Text_20_Body" style:family="paragraph">
+    <style:paragraph-properties fo:margin-bottom="0.2cm"/>
+    <style:text-properties fo:font-size="11pt" fo:font-family="Georgia,serif" fo:line-height="180%"/>
+  </style:style>
+  <style:style style:name="Heading_20_1" style:family="paragraph">
+    <style:text-properties fo:font-size="18pt" fo:font-weight="bold"/>
+  </style:style>
+</office:styles>
+<office:body><office:text>
+  <text:p text:style-name="Heading_20_1">${note.title.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</text:p>
+  ${body}
+</office:text></office:body>
+</office:document>`;
+}
+function mdToRtf(note){
+  const plain=mdToPlain(note.content);
+  const rtfEsc=s=>s.replace(/\\/g,"\\\\").replace(/\{/g,"\\{").replace(/\}/g,"\\}").replace(/[^\x00-\x7F]/g,c=>`\\u${c.codePointAt(0)}?`);
+  const body=plain.split("\n").map(l=>l.trim()?`\\pard\\sa120\\sl360\\slmult1 ${rtfEsc(l)}\\par`:"\\pard\\sa120\\par").join("\n");
+  return `{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Georgia;}}{\\colortbl;\\red44\\green42\\blue38;}\\deflang1046\\widowctrl\\hyphauto\n\\pard\\sa200\\b\\fs36 ${rtfEsc(note.title)}\\b0\\par\n${body}\n}`;
+}
+
+function doExport(note,fmt){
+  if(fmt==="pdf"){
+    // Open print window with Latin Modern styling
+    const html=buildLatexHtml(note);
+    const w=window.open("","_blank");
+    w.document.write(html);
+    w.document.close();
+    w.onload=()=>{ w.focus(); w.print(); };
+    return;
+  }
+  let c="",mime="text/plain",ext="txt";
+  if(fmt==="markdown"){c=note.content;mime="text/markdown";ext="md";}
+  else if(fmt==="html-latex"){c=buildLatexHtml(note);mime="text/html";ext="html";}
+  else if(fmt==="html"){
+    const body=md(note.content);
+    c=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${note.title}</title><style>body{font-family:Georgia,serif;max-width:760px;margin:60px auto;padding:0 20px;line-height:1.8;color:#2c2a26}code{background:#f0ece2;padding:2px 6px;border-radius:3px;font-size:.9em}pre{background:#f0ece2;padding:16px;border-radius:6px;overflow-x:auto}blockquote{border-left:3px solid #b8965a;padding-left:16px;color:#7a6640;margin:0;font-style:italic}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:8px 12px}th{background:#f5f0e8}.wikilink{color:#2a6e87}</style></head><body>${body}</body></html>`;
+    mime="text/html";ext="html";
+  } else if(fmt==="fodt"){c=mdToFodt(note);mime="application/vnd.oasis.opendocument.text-flat-xml";ext="fodt";}
+  else if(fmt==="rtf"){c=mdToRtf(note);mime="application/rtf";ext="rtf";}
+  else{c=mdToPlain(note.content);}
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([c],{type:mime}));
+  a.download=`${slugify(note.title)||"nota"}.${ext}`;
+  a.click();
+}
+
+// ══════════════════════════════════════════
+//  SITE HTML EXPORT — exportSiteZip()
+//  Exporta todas as notas como website completo em .zip:
+//  - index.html   : página inicial com lista e busca
+//  - style.css    : Latin Modern + navegação (compartilhado)
+//  - {slug}.html  : uma página por nota, links entre notas resolvidos
+// ══════════════════════════════════════════
+
+// Reserved filenames that cannot be used for note pages
+const _RESERVED_SLUGS = new Set(["index", "style"]);
+
+function noteSlug(title){
+  const base = (slugify(title)||"nota").toLowerCase();
+  // Avoid collision with generated site files
+  return _RESERVED_SLUGS.has(base) ? base + "-nota" : base;
+}
+
+// ── B: Auto-link note titles in rendered HTML ─────────────────
+// Scans text nodes in the rendered HTML and links any occurrence
+// of a note title to its page. Longer titles are matched first
+// to avoid partial matches ("Filosofia" before "Filo").
+// Skips content already inside <a>, <code>, <pre>, <h1>-<h6>.
+function autoLinkTitles(html, noteMap){
+  if(!noteMap.size) return html;
+
+  // Sort titles longest-first to prevent partial matches
+  const titles = [...noteMap.entries()]
+    .sort((a,b) => b[0].length - a[0].length);
+
+  // We work on text segments outside of HTML tags.
+  // Split into [tag, text, tag, text ...] and only process text parts.
+  const parts = html.split(/(<[^>]+>)/);
+  let inProtected = 0; // depth counter for a/code/pre/hN tags
+
+  return parts.map(part => {
+    if(part.startsWith("<")){
+      const tag = part.match(/^<\/?([a-z0-9]+)/i)?.[1]?.toLowerCase();
+      const isClose = part.startsWith("</");
+      const protected_tags = new Set(["a","code","pre","h1","h2","h3","h4","h5","h6"]);
+      if(protected_tags.has(tag)){
+        inProtected += isClose ? -1 : 1;
+      }
+      return part;
+    }
+    // Text node — apply auto-linking if not inside protected element
+    if(inProtected > 0) return part;
+    let text = part;
+    for(const [titleLower, slug] of titles){
+      // Build a case-insensitive word-boundary regex for this title
+      // Escape special regex chars in the title
+      const esc = titleLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Use word boundaries; for titles ending/starting with non-word chars,
+      // use lookahead/lookbehind for space or start/end of string
+      const re = new RegExp(`(?<![\\w\\-])${esc}(?![\\w\\-])`, 'gi');
+      text = text.replace(re, match =>
+        `<a href="${slug}.html" class="auto-link">${match}</a>`
+      );
+    }
+    return text;
+  }).join("");
+}
+
+function mdForSite(content, noteMap){
+  const html = md(content);
+  // Step 1: resolve explicit [[wikilinks]]
+  const linked = html.replace(
+    /<span class="wikilink (?:wikilink-exists|wikilink-missing)"[^>]*data-title="([^"]*)"[^>]*>([^<]*)<\/span>/g,
+    (_, title, label) => {
+      const slug = noteMap.get(title.toLowerCase());
+      if(slug) return `<a href="${slug}.html" class="wikilink-exists">${label}</a>`;
+      return `<span class="wikilink-missing">${label}</span>`;
+    }
+  );
+  // Step 2: auto-link remaining note titles in text (B)
+  return autoLinkTitles(linked, noteMap);
+}
+
+// ── A: Tag page builder ────────────────────────────────────────
+function tagSlug(tag){
+  return "tag-" + (slugify(tag)||"tag").toLowerCase();
+}
+
+function buildSiteTagPage(tag, tagNotes, siteTitle){
+  const now = new Date().toLocaleDateString("pt-BR");
+  const items = tagNotes.map(n =>
+    `<li><a href="${noteSlug(n.title)}.html">${n.title}</a>
+     <span class="note-meta">${n.updated||""}</span></li>`
+  ).join("");
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>${siteTitle} — #${tag}</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<nav class="site-nav">
+  <span class="nav-title">${siteTitle}</span>
+  <span class="nav-sep">›</span>
+  <span class="tag-pill">#${tag}</span>
+  <a href="index.html">← Índice</a>
+</nav>
+<h1><span class="tag-pill-lg">#${tag}</span></h1>
+<p>${tagNotes.length} nota${tagNotes.length!==1?"s":""} com esta palavra-chave.</p>
+<ul class="note-list">${items}</ul>
+<footer>
+  <a href="https://askesis.hypotheses.org">askesis.hypotheses.org</a>
+  · Exportado em ${now}
+</footer>
+</body>
+</html>`;
+}
+
+// Fetch a font URL and return a base64 data URI, or the original URL on failure
+async function _fontToDataUri(url){
+  try{
+    const res = await fetch(url);
+    if(!res.ok) throw new Error(res.status);
+    const buf = await res.arrayBuffer();
+    const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+    const mime = url.endsWith(".woff2") ? "font/woff2" : "font/woff";
+    return `data:${mime};base64,${b64}`;
+  }catch{
+    return url; // fallback: keep original URL
+  }
+}
+
+async function buildSiteCss(){
+  // Fetch all four Latin Modern variants in parallel
+  setSaved(false,"⏳ Baixando fontes Latin Modern…");
+  const base = "https://latex.now.sh/fonts/";
+  const [rw2,rw,iw2,iw,bw2,bw,biw2,biw] = await Promise.all([
+    _fontToDataUri(base+"LM-regular.woff2"),
+    _fontToDataUri(base+"LM-regular.woff"),
+    _fontToDataUri(base+"LM-italic.woff2"),
+    _fontToDataUri(base+"LM-italic.woff"),
+    _fontToDataUri(base+"LM-bold.woff2"),
+    _fontToDataUri(base+"LM-bold.woff"),
+    _fontToDataUri(base+"LM-bold-italic.woff2"),
+    _fontToDataUri(base+"LM-bold-italic.woff"),
+  ]);
+  setSaved(false,"⏳ Gerando site…");
+
+  return `
+@font-face{font-family:'Latin Modern';font-style:normal;font-weight:normal;src:url('${rw2}') format('woff2'),url('${rw}') format('woff')}
+@font-face{font-family:'Latin Modern';font-style:italic;font-weight:normal;src:url('${iw2}') format('woff2'),url('${iw}') format('woff')}
+@font-face{font-family:'Latin Modern';font-style:normal;font-weight:bold;src:url('${bw2}') format('woff2'),url('${bw}') format('woff')}
+@font-face{font-family:'Latin Modern';font-style:italic;font-weight:bold;src:url('${biw2}') format('woff2'),url('${biw}') format('woff')}
+*{box-sizing:border-box}
+html{font-size:1rem;scroll-behavior:smooth}
+body{font-family:'Latin Modern',Georgia,'Times New Roman',serif;max-width:52em;margin:0 auto;padding:2em 2em 4em;line-height:1.85;color:#111;background:#faf8f3}
+nav.site-nav{display:flex;align-items:center;gap:1em;flex-wrap:wrap;border-bottom:1px solid #ccc;padding-bottom:.8em;margin-bottom:2em;font-size:.85em;color:#666}
+nav.site-nav a{color:#0070b7;text-decoration:none}
+nav.site-nav a:hover{text-decoration:underline;color:#d86d4e}
+nav.site-nav .nav-title{font-style:italic;color:#b8965a;margin-right:auto}
+nav.site-nav .nav-sep{color:#ccc}
+h1,h2,h3,h4{font-family:'Latin Modern',Georgia,serif;font-weight:normal;margin-top:1.8em;margin-bottom:.5em}
+h1{font-size:2em;border-bottom:1px solid #ccc;padding-bottom:.4em;margin-top:.6em}
+h2{font-size:1.4em}h3{font-size:1.15em}h4{font-size:1em;font-weight:bold}
+p{text-align:justify;hyphens:auto;margin:.8em 0;font-size:1.05em}
+a,a:visited{color:#0070b7;text-decoration:none}
+a:hover{color:#d86d4e;text-decoration:underline}
+strong{font-weight:bold}em{font-style:italic}del{opacity:.5;text-decoration:line-through}
+blockquote{margin:1.2em 2em;padding:.8em 1.2em;font-size:95%;line-height:1.6;color:#555;border-left:4px solid #b8965a;background:#fdfaf5}
+code{font-family:'Courier New',monospace;font-size:.88em;background:#f3f0e8;padding:2px 5px;border-radius:3px}
+pre{background:#f3f0e8;border:1px solid #ddd;border-radius:4px;padding:1.2em;overflow-x:auto;margin:1.2em 0}
+pre code{background:transparent;padding:0}
+ul,ol{padding-left:2em;margin:.6em 0;font-size:1.05em;line-height:1.6}
+li{margin-bottom:.3em}
+hr{border:none;border-top:1px solid #ccc;margin:2em 0}
+table{width:100%;border-collapse:collapse;margin:1.2em 0;font-size:.95em}
+td,th{border:1px solid #ccc;padding:.5em .9em}
+th{background:#f5f0e8;font-weight:bold}
+.spacer{height:.6em}
+sup a{color:#0070b7;text-decoration:none;font-size:.8em}
+.footnotes{font-size:.88em;color:#555;border-top:1px solid #ddd;margin-top:2em;padding-top:1em}
+.fn-back{color:#888;text-decoration:none;margin-left:.3em}
+.fn-sep{margin:2em 0 1em;border-top:1px solid #ddd}
+.wikilink-exists{color:#0070b7;text-decoration:underline}
+.wikilink-missing{color:#aaa;text-decoration:underline dashed}
+.backlinks{margin-top:3em;padding:1em 1.4em;background:#f5f0e8;border:1px solid #ddd;border-radius:4px;font-size:.9em}
+.backlinks h4{margin:0 0 .6em;font-size:.9em;letter-spacing:.08em;text-transform:uppercase;color:#888}
+.backlinks ul{margin:0;padding-left:1.4em}
+.backlinks a{color:#0070b7}
+.note-tags{margin:.4em 0 1.6em;display:flex;gap:.4em;flex-wrap:wrap}
+.note-tag{font-size:.78em;padding:2px 8px;border-radius:2px;background:#ede9df;color:#7a6640;font-style:italic}
+.index-search{width:100%;padding:.5em .8em;font-size:1em;font-family:'Latin Modern',Georgia,serif;border:1px solid #ccc;border-radius:3px;background:#fff;margin:1em 0 1.4em}
+.index-search:focus{outline:none;border-color:#b8965a}
+.note-list{list-style:none;padding:0;margin:0}
+.note-list li{padding:.6em 0;border-bottom:1px solid #eee;display:flex;align-items:baseline;gap:.8em}
+.note-list li:last-child{border:none}
+.note-list a{color:#0070b7;font-size:1.05em}
+.note-list a:hover{color:#d86d4e}
+.note-list .note-meta{font-size:.82em;color:#aaa;margin-left:auto;white-space:nowrap}
+.note-list .note-tags-inline{font-size:.78em;color:#b8965a;font-style:italic}
+.folder-section h2{font-size:1em;letter-spacing:.1em;text-transform:uppercase;color:#aaa;border-bottom:1px solid #eee;padding-bottom:.3em;margin:2em 0 .8em}
+footer{margin-top:4em;padding-top:1.2em;border-top:1px solid #eee;font-size:.8em;color:#aaa;text-align:center}
+footer a{color:#b8965a}
+.site-intro{margin-bottom:1.8em;padding-bottom:1.2em;border-bottom:1px solid #e8e4db}
+.site-intro p{text-align:justify;hyphens:auto}
+/* ── Tag cloud (index page) ── */
+.tags-cloud-section{margin:1.6em 0 1.4em;padding:1em 1.2em;background:#f5f0e8;border-radius:4px}
+.tags-cloud-title{font-size:.9em;letter-spacing:.1em;text-transform:uppercase;color:#aaa;margin:0 0 .8em;font-weight:normal}
+.tags-cloud{display:flex;flex-wrap:wrap;gap:.5em}
+.tag-cloud-pill{display:inline-flex;align-items:center;gap:.3em;padding:4px 10px;border-radius:20px;background:#ede9df;color:#7a6640;text-decoration:none;font-size:.85em;font-style:italic;transition:background .15s,color .15s}
+.tag-cloud-pill:hover{background:#b8965a;color:#fff}
+.tag-count{font-size:.78em;opacity:.7;font-style:normal}
+/* ── Tag pills (note pages and index list) ── */
+a.note-tag{display:inline-block;font-size:.78em;padding:2px 8px;border-radius:2px;background:#ede9df;color:#7a6640;text-decoration:none;font-style:italic}
+a.note-tag:hover{background:#b8965a;color:#fff}
+/* ── Tag page ── */
+.tag-pill{font-size:.9em;font-style:italic;color:#b8965a;background:#f5f0e8;padding:2px 8px;border-radius:20px}
+.tag-pill-lg{font-size:.7em;vertical-align:middle;font-style:italic;color:#b8965a;background:#f5f0e8;padding:3px 12px;border-radius:20px;letter-spacing:.02em}
+/* ── Auto-links (B) ── */
+.auto-link{color:#4a7fa5;text-decoration:underline dotted;text-underline-offset:3px}
+.auto-link:hover{color:#d86d4e;text-decoration:underline}
+@media print{body{margin:0;padding:1cm;max-width:100%;background:#fff}nav.site-nav,.backlinks{display:none}a{color:#000;text-decoration:none}pre{white-space:pre-wrap}}
+@page{size:A4;margin:2.5cm 2cm 2.5cm 2.5cm}
+`.trim();
+}
+
+function buildSiteNotePage(note, noteMap, backlinks, folderName){
+  const bodyHtml = mdForSite(note.content, noteMap);
+  // A: tags → links to tag pages
+  const tags = (note.tags||[]).map(t=>
+    `<a href="${tagSlug(t)}.html" class="note-tag">${t}</a>`
+  ).join("");
+  const blHtml = backlinks.length
+    ? `<div class="backlinks"><h4>Citado em</h4><ul>${
+        backlinks.map(b=>`<li><a href="${noteSlug(b.title)}.html">${b.title}</a></li>`).join("")
+      }</ul></div>` : "";
+  const crumb = folderName
+    ? `<span class="nav-sep">›</span> <span>${folderName}</span>` : "";
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>${note.title}</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<nav class="site-nav">
+  <span class="nav-title">Askesis-Zettel</span>
+  ${crumb}
+  <a href="index.html">← Índice</a>
+</nav>
+${tags?`<div class="note-tags">${tags}</div>`:""}
+${bodyHtml}
+${blHtml}
+<footer>
+  Gerado por <a href="https://askesis.hypotheses.org">Askesis-Zettel</a>
+  · ${new Date().toLocaleDateString("pt-BR")}
+</footer>
+</body>
+</html>`;
+}
+
+function buildSiteIndex(siteNotes, folderGroups, indexMeta, tagMap){
+  const now = new Date().toLocaleDateString("pt-BR");
+  const siteTitle   = indexMeta?.title       || "Askesis-Zettel — Índice";
+  const siteDesc    = indexMeta?.description || "";
+  const siteAuthor  = indexMeta?.author      || "";
+  const introHtml   = indexMeta?.introHtml   || "";
+
+  const noteData = JSON.stringify(siteNotes.map(n=>({
+    slug:noteSlug(n.title), title:n.title,
+    tags:n.tags||[], updated:n.updated||"",
+  })));
+  const sections = folderGroups.map(([folder, fnotes])=>{
+    const items = fnotes.map(n=>{
+      const tg = (n.tags||[]).length
+        ? `<span class="note-tags-inline">${n.tags.map(t=>`<a href="${tagSlug(t)}.html">${t}</a>`).join(", ")}</span>` : "";
+      return `<li><a href="${noteSlug(n.title)}.html">${n.title}</a> ${tg}<span class="note-meta">${n.updated||""}</span></li>`;
+    }).join("");
+    return `<div class="folder-section"><h2>${folder||"Notas"}</h2><ul class="note-list">${items}</ul></div>`;
+  }).join("");
+
+  // A: tags cloud sorted by frequency
+  let tagsSection = "";
+  if(tagMap && tagMap.size){
+    const sorted = [...tagMap.entries()].sort((a,b)=>b[1].length-a[1].length);
+    const pills = sorted.map(([tag,tnotes])=>
+      `<a href="${tagSlug(tag)}.html" class="tag-cloud-pill"
+         title="${tnotes.length} nota${tnotes.length!==1?"s":""}">${tag} <span class="tag-count">${tnotes.length}</span></a>`
+    ).join("");
+    tagsSection = `<div class="tags-cloud-section">
+      <h2 class="tags-cloud-title">Palavras-chave</h2>
+      <div class="tags-cloud">${pills}</div></div>`;
+  }
+
+  const navSub = siteAuthor
+    ? `<span>${siteAuthor}</span><span class="nav-sep">·</span><span>${siteNotes.length} notas · ${now}</span>`
+    : `<span>${siteNotes.length} notas · ${now}</span>`;
+  const introBlock = introHtml
+    ? `<div class="site-intro">${introHtml}</div>`
+    : `<p>Gerado a partir de um Zettelkasten pelo
+        <a href="https://askesis.hypotheses.org">projeto Askesis</a>.</p>`;
+  const descMeta = siteDesc
+    ? `<meta name="description" content="${siteDesc.replace(/"/g,"&quot;")}"/>\n` : "";
+  const authorMeta = siteAuthor
+    ? `<meta name="author" content="${siteAuthor.replace(/"/g,"&quot;")}"/>\n` : "";
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+${descMeta}${authorMeta}<title>${siteTitle}</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<nav class="site-nav">
+  <span class="nav-title">${siteTitle}</span>
+  ${navSub}
+</nav>
+<h1>${siteTitle}</h1>
+${introBlock}
+${tagsSection}
+<input class="index-search" type="search" placeholder="Buscar notas…"
+  id="idx-search" oninput="filterNotes(this.value)" autocomplete="off"/>
+<div id="idx-body">${sections}</div>
+<footer>
+  <a href="https://askesis.hypotheses.org">askesis.hypotheses.org</a>
+  · Exportado em ${now}
+</footer>
+<script>
+const _n=${noteData};
+function filterNotes(q){
+  const b=document.getElementById("idx-body");
+  q=q.toLowerCase().trim();
+  if(!q){b.innerHTML=${JSON.stringify(sections)};return;}
+  const m=_n.filter(n=>n.title.toLowerCase().includes(q)||n.tags.some(t=>t.toLowerCase().includes(q)));
+  if(!m.length){b.innerHTML='<p style="color:#aaa;font-style:italic">Nenhuma nota encontrada.</p>';return;}
+  b.innerHTML='<ul class="note-list">'+m.map(n=>'<li><a href="'+n.slug+'.html">'+n.title+'</a>'+(n.tags.length?'<span class="note-tags-inline">'+n.tags.map(t=>'<a href="tag-'+t.toLowerCase().replace(/[^\w\-]/g,'')+'.html">'+t+'</a>').join(', ')+'</span>':'')+' <span class="note-meta">'+n.updated+'</span></li>').join('')+'</ul>';
+}
+<\/script>
+</body>
+</html>`;
+}
+
+
+async function exportSiteZip(){
+  const allNotes = notes.filter(n=>n.content&&n.content.trim());
+  if(!allNotes.length){ alert("Nenhuma nota para exportar."); return; }
+
+  setSaved(false,"⏳ Gerando site…");
+
+  if(typeof JSZip==="undefined"){
+    alert("JSZip não carregado — verifique sua conexão e tente novamente.");
+    setSaved(true); return;
+  }
+
+  // ── Detect _index note ────────────────────────────────────────────
+  // A note titled "_index" (or filename "_index.md") is treated as a
+  // site template: its frontmatter configures the index page and its
+  // body is rendered as the introduction text. It is NOT exported as
+  // a standalone page.
+  const indexNote = allNotes.find(n=>
+    n.title.toLowerCase()==="_index" ||
+    n.filename?.toLowerCase()==="_index.md"
+  );
+
+  // Parse metadata from _index frontmatter + render body as intro
+  let indexMeta = null;
+  if(indexNote){
+    const fm = parseFrontmatter(indexNote.content);
+    // Strip frontmatter from body, render remaining Markdown as intro
+    let body = indexNote.content.replace(/^---[\s\S]*?---\n?/,"").trim();
+    indexMeta = {
+      title:      fm?.title       || fm?.nome   || "",
+      description:fm?.description || fm?.desc   || "",
+      author:     fm?.author      || fm?.autor  || "",
+      introHtml:  body ? mdForSite(body, new Map()) : "",
+    };
+  }
+
+  // Exclude _index from the exported pages
+  const siteNotes = allNotes.filter(n=>n!==indexNote);
+
+  // ── slug → note map for wikilink resolution ───────────────────────
+  const noteMap = new Map(siteNotes.map(n=>[n.title.toLowerCase(), noteSlug(n.title)]));
+
+  // ── Backlinks index ───────────────────────────────────────────────
+  const blMap = new Map();
+  siteNotes.forEach(n=>{
+    (n.content.match(/\[\[([^\]]+)\]\]/g)||[]).forEach(lk=>{
+      const t=lk.slice(2,-2).toLowerCase();
+      const tgt=siteNotes.find(x=>x.title.toLowerCase()===t);
+      if(tgt){ if(!blMap.has(tgt.id))blMap.set(tgt.id,[]); blMap.get(tgt.id).push(n); }
+    });
+  });
+
+  // ── Folder names per note ─────────────────────────────────────────
+  const folderNames = new Map();
+  for(const folder of openFolders){
+    Object.keys(folder.fileHandles).forEach(rp=>{
+      const id="fp_"+folder.id+"_"+rp.replace(/[^a-z0-9]/gi,"_");
+      folderNames.set(id, folder.name);
+    });
+  }
+
+  // ── Folder groups for index ───────────────────────────────────────
+  const groupMap = new Map();
+  siteNotes.forEach(n=>{
+    const k=folderNames.get(n.id)||"";
+    if(!groupMap.has(k))groupMap.set(k,[]);
+    groupMap.get(k).push(n);
+  });
+  const folderGroups=[...groupMap.entries()].sort((a,b)=>(!a[0])?-1:(!b[0])?1:a[0].localeCompare(b[0]));
+
+  // ── Build ZIP ─────────────────────────────────────────────────────
+  // A: Build tag → [notes] map
+  const tagMap = new Map();
+  siteNotes.forEach(n=>{
+    (n.tags||[]).forEach(t=>{
+      if(!tagMap.has(t)) tagMap.set(t,[]);
+      tagMap.get(t).push(n);
+    });
+  });
+  const siteTitle = indexMeta?.title || "Askesis-Zettel — Índice";
+
+  const zip = new JSZip();
+  zip.file("style.css", await buildSiteCss());
+  zip.file("index.html", buildSiteIndex(siteNotes, folderGroups, indexMeta, tagMap));
+
+  // One page per note
+  siteNotes.forEach(n=>{
+    zip.file(
+      noteSlug(n.title)+".html",
+      buildSiteNotePage(n, noteMap, blMap.get(n.id)||[], folderNames.get(n.id)||"")
+    );
+  });
+
+  // A: One page per tag
+  tagMap.forEach((tnotes, tag)=>{
+    zip.file(tagSlug(tag)+".html", buildSiteTagPage(tag, tnotes, siteTitle));
+  });
+
+  const blob = await zip.generateAsync({
+    type:"blob", compression:"DEFLATE", compressionOptions:{level:6}
+  });
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=`askesis-site-${new Date().toISOString().slice(0,10)}.zip`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  const ni=indexNote?" (+ _index como template)":"";
+  const nt=tagMap.size?` · ${tagMap.size} palavras-chave`:"";
+  setSaved(true,`✓ Site exportado — ${siteNotes.length} páginas${nt}${ni}`);
+}
+
+// ══════════════════════════════════════════
+//  THEME
+// ══════════════════════════════════════════
+function applyTheme(key){
+  currentTheme=key;
+  const v=THEMES[key].vars,r=document.documentElement;
+  Object.entries(v).forEach(([k,val])=>r.style.setProperty(k,val));
+  document.getElementById("theme-color-meta").setAttribute("content",v["--bg-primary"]);
+  localStorage.setItem("askesis-theme",key);
+  renderThemeGrid();
+}
+function renderThemeGrid(){
+  const g=document.getElementById("theme-grid");g.innerHTML="";
+  Object.entries(THEMES).forEach(([key,t])=>{
+    const v=t.vars,d=document.createElement("div");
+    d.className="th-opt"+(currentTheme===key?" on":"");
+    d.style.cssText=`background:${v["--bg-secondary"]};color:${v["--text-primary"]};border-color:${currentTheme===key?v["--accent"]:v["--border"]}`;
+    d.innerHTML=`<div style="font-size:11px;margin-bottom:5px">${t.label}</div><div class="th-dots">${[v["--accent"],v["--link"],v["--tag-text"],v["--text-secondary"]].map(c=>`<div class="th-dot" style="background:${c}"></div>`).join("")}</div>`;
+    d.onclick=()=>{applyTheme(key);closeModal("modal-theme");};
+    g.appendChild(d);
+  });
+}
+
+// ══════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════
+function renderTabs(){
+  const bar=document.getElementById("tabs-bar");bar.innerHTML="";
+  tabs.forEach((tab,idx)=>{
+    const note=notes.find(n=>n.id===tab.noteId);
+    const d=document.createElement("div");
+    d.className="tab"+(activeTab===idx?" on":"");
+    // show folder icon if note has a folder handle
+    const hasFh=note&&(fileHandles[note.id]||_allTitleIndex()[note.title?.toLowerCase()]);
+    d.innerHTML=`<span class="tab-name">${hasFh?"📄 ":""}${note?note.title:"Sem título"}</span><span class="tab-x">×</span>`;
+    d.onclick=(e)=>{if(e.target.classList.contains("tab-x")){closeTab(idx);return;}setActiveTab(idx);};
+    bar.appendChild(d);
+  });
+  const nb=document.createElement("button");
+  nb.id="tab-new";nb.textContent="+";nb.onclick=()=>openModal("modal-new");
+  bar.appendChild(nb);
+}
+function setActiveTab(idx){activeTab=idx;_statusCache={noteId:null,bl:0};renderTabs();renderEditor();renderSidebar();renderStatus();}
+function closeTab(idx){if(tabs.length===1)return;tabs.splice(idx,1);activeTab=Math.min(activeTab,tabs.length-1);renderTabs();renderEditor();renderSidebar();renderStatus();}
+function openNote(noteId){
+  const idx=tabs.findIndex(t=>t.noteId===noteId);
+  if(idx>=0){activeTab=idx;}else{tabs.push({noteId});activeTab=tabs.length-1;}
+  renderTabs();renderEditor();renderSidebar();renderStatus();
+}
+
+// ══════════════════════════════════════════
+//  EDITOR + HIGHLIGHT LAYER SYNC
+//
+//  Architecture:
+//  - #editor    : textarea, z-index 2, transparent text, scrolls normally
+//  - #hl-layer  : div, z-index 1, never scrolls, shifted via transform
+//
+//  Three invariants that MUST hold at all times:
+//  1. Same font / font-size / line-height / padding-* (guaranteed by CSS vars)
+//  2. Same content width (hl right-padding compensates for scrollbar gutter)
+//  3. Same vertical offset (hl translated by -scrollTop)
+//
+//  Rule: syncScroll must ALWAYS run after innerHTML is committed to DOM
+//  so the browser has the correct scrollHeight. Never call syncScroll
+//  inside the same microtask as innerHTML assignment.
+// ══════════════════════════════════════════
+
+const _ta=()=>document.getElementById("editor");
+const _hl=()=>document.getElementById("hl-layer");
+
+// Read the actual computed horizontal padding from the textarea —
+// never hardcode it, so CSS changes (responsive, focus mode) are
+// automatically reflected.
+function _getPadH(){
+  const ta=_ta();
+  if(!ta)return 0;
+  // getComputedStyle is accurate after layout; returns "Npx"
+  return parseFloat(getComputedStyle(ta).paddingRight)||0;
+}
+
+// syncLayerWidth: make the layer's usable text area identical to the textarea.
+// The textarea uses scrollbar-gutter:stable, so clientWidth already excludes
+// the reserved gutter space. The layer must match that same width.
+function syncLayerWidth(){
+  const ta=_ta(), hl=_hl();
+  if(!ta||!hl)return;
+  // scrollbar gutter width = reserved space even when bar is hidden
+  const gutterW=ta.offsetWidth-ta.clientWidth;
+  // Read the actual right padding so we stay in sync with CSS
+  const padR=_getPadH();
+  hl.style.paddingRight=(padR+gutterW)+"px";
+}
+
+// syncScroll: shift the highlight layer to match the textarea's scroll.
+// Must be called AFTER innerHTML is in the DOM (browser has layout).
+function syncScroll(){
+  const ta=_ta(), hl=_hl();
+  if(!ta||!hl)return;
+  hl.style.transform=`translateY(${-ta.scrollTop}px)`;
+}
+
+// renderHighlight: update layer content then sync geometry.
+// Uses a single rAF so innerHTML + layout + syncScroll happen in order:
+//   1. innerHTML assigned  (DOM mutation)
+//   2. rAF fires           (browser has laid out the new content)
+//   3. syncLayerWidth      (reads fresh offsetWidth/clientWidth)
+//   4. syncScroll          (reads scrollTop against new layout)
+let _hlRaf=null;
+function renderHighlight(){
+  const ta=_ta(), hl=_hl();
+  if(!hl||!ta)return;
+  if(_hlRaf)cancelAnimationFrame(_hlRaf);
+  // Assign innerHTML synchronously so the DOM mutation is queued,
+  // then let rAF fire after the browser processes layout.
+  hl.innerHTML=hlMd(ta.value);
+  _hlRaf=requestAnimationFrame(()=>{
+    syncLayerWidth();
+    syncScroll();
+    _hlRaf=null;
+  });
+}
+
+function renderEditor(){
+  const n=curNote();
+  const ta=_ta();
+  ta.value=n?n.content:"";
+  ta.scrollTop=0;
+  _hlCacheReset(); // note changed — stale cache must be discarded
+  renderHighlight();
+  renderPreview();
+}
+
+// ResizeObserver: fires when editor-wrap changes size (window resize,
+// sidebar toggle, split-view change, mobile orientation).
+// We DON'T call renderHighlight here — that would cause a full re-render
+// on every resize frame. Instead we only recalculate geometry:
+// re-wrap the *existing* layer content by forcing a reflow, then re-sync.
+(function(){
+  const wrap=document.getElementById("editor-wrap");
+  if(!wrap||!window.ResizeObserver)return;
+  let _resizeRaf=null;
+  new ResizeObserver(()=>{
+    if(_resizeRaf)cancelAnimationFrame(_resizeRaf);
+    _resizeRaf=requestAnimationFrame(()=>{
+      // Full re-render needed because word-wrap recalculates line breaks
+      // when container width changes — line count can change, so a geometry-
+      // only sync is insufficient. But we batch it to one rAF per resize burst.
+      renderHighlight();
+      _resizeRaf=null;
+    });
+  }).observe(wrap);
+})();
+
+// (scroll event registered below with editorEl)
+function renderPreview(){
+  const n=curNote();
+  document.getElementById("preview").innerHTML=n?md(n.content):"";
+}
+
+// ══════════════════════════════════════════
+//  SIDEBAR
+// ══════════════════════════════════════════
+function renderSidebar(){
+  const note=curNote();
+  const cont=document.getElementById("sb-content");
+  const q=searchQuery.toLowerCase();
+
+  if(sidebarMode==="explorer"){
+    // ── Search mode: flat list across all notes ──
+    if(q){
+      const filtered=notes.filter(n=>
+        n.title.toLowerCase().includes(q)||
+        n.content.toLowerCase().includes(q)||
+        n.tags?.some(t=>t.toLowerCase().includes(q))
+      );
+      if(!filtered.length){cont.innerHTML=`<div class="sb-empty">Nenhuma nota encontrada.</div>`;return;}
+      cont.innerHTML=filtered.map(n=>`
+        <div class="ni${n.id===tabs[activeTab]?.noteId?" on":""}" data-id="${n.id}">
+          <button class="ni-del" data-del="${n.id}">✕</button>
+          <div class="ni-title">${n.filename?escHtml(n.filename):escHtml(n.title)}</div>
+          <div class="ni-meta">${n.updated}</div>
+          ${n.tags?.length?`<div class="ni-tags">${n.tags.map(t=>`<span class="chip">${t}</span>`).join("")}</div>`:""}
+        </div>`).join("");
+      cont.querySelectorAll(".ni").forEach(el=>el.onclick=e=>{
+        if(e.target.dataset.del){deleteNote(e.target.dataset.del);return;}
+        openNote(el.dataset.id);
+      });
+      return;
+    }
+
+    // ── Tree mode: one section per open folder + internal notes ──
+    let html="";
+
+    // Internal notes (not from any folder)
+    const folderIds=new Set(openFolders.flatMap(f=>
+      Object.keys(f.fileHandles).map(rp=>"fp_"+rp.replace(/[^a-z0-9]/gi,"_"))
+    ));
+    const internalNotes=notes.filter(n=>!n.id.startsWith("fp_")&&!folderIds.has(n.id));
+
+    if(internalNotes.length){
+      html+=`<div class="fld-internal-label">Notas internas</div>`;
+      html+=internalNotes.map(n=>`
+        <div class="ni${n.id===tabs[activeTab]?.noteId?" on":""}" data-id="${n.id}">
+          <button class="ni-del" data-del="${n.id}">✕</button>
+          <div class="ni-title">${escHtml(n.title)}</div>
+          <div class="ni-meta">${n.updated}</div>
+        </div>`).join("");
+    }
+
+    // One section per open folder
+    for(const folder of openFolders){
+      if(html) html+=`<div class="fld-sep"></div>`;
+      const isOpen=!folder.headerCollapsed;
+      html+=`<div class="fld-section" data-fid="${folder.id}">
+        <div class="fld-header" data-fid-toggle="${folder.id}">
+          <span class="fld-header-arrow${isOpen?" open":""}">▶</span>
+          <span class="fld-header-name" title="${escHtml(folder.name)}">📁 ${escHtml(folder.name)}</span>
+          <span class="fld-header-btns">
+            <button class="fld-btn" data-fid-sync="${folder.id}" title="Recarregar">↺</button>
+            <button class="fld-btn" data-fid-close="${folder.id}" title="Fechar pasta">✕</button>
+          </span>
+        </div>
+        <div class="fld-body${isOpen?"":" hidden"}" data-fid-body="${folder.id}">
+          ${folder.tree?renderFolderTree(folder.tree,0,folder):""}
+        </div>
+      </div>`;
+    }
+
+    if(!html) html=`<div class="sb-empty">Nenhuma nota. Crie uma (+) ou abra uma pasta (⊞).</div>`;
+    cont.innerHTML=html;
+
+    // Bind internal note clicks
+    cont.querySelectorAll(".ni").forEach(el=>el.onclick=e=>{
+      if(e.target.dataset.del){deleteNote(e.target.dataset.del);return;}
+      openNote(el.dataset.id);
+    });
+
+    // Bind folder header toggles
+    cont.querySelectorAll("[data-fid-toggle]").forEach(el=>el.onclick=()=>{
+      const f=openFolders.find(x=>x.id===el.dataset.fidToggle);
+      if(f){f.headerCollapsed=!f.headerCollapsed;renderSidebar();}
+    });
+
+    // Bind sync buttons
+    cont.querySelectorAll("[data-fid-sync]").forEach(el=>el.onclick=async(e)=>{
+      e.stopPropagation();
+      const f=openFolders.find(x=>x.id===el.dataset.fidSync);
+      if(f) await reloadFolder(f);
+    });
+
+    // Bind close buttons
+    cont.querySelectorAll("[data-fid-close]").forEach(el=>el.onclick=(e)=>{
+      e.stopPropagation();
+      closeFolder(el.dataset.fidClose);
+    });
+
+    // Bind tree notes
+    bindFolderTree(cont);
+
+  } else if(sidebarMode==="backlinks"){
+    const backlinks=note?notes.filter(n=>n.id!==note.id&&n.content.toLowerCase().includes(`[[${note.title.toLowerCase()}]]`)):[];
+    let h=`<div class="sb-sec">Backlinks → ${note?note.title:""}</div>`;
+    if(!backlinks.length)h+=`<div class="sb-empty">Nenhuma nota aponta para esta.</div>`;
+    else backlinks.forEach(n=>{h+=`<div class="bl-item" data-id="${n.id}">${n.title}</div>`;});
+    h+=`<div class="sb-sec" style="margin-top:14px">Links nesta nota</div>`;
+    const wl=note?(note.content.match(/\[\[([^\]]+)\]\]/g)||[]):[];
+    if(!wl.length)h+=`<div class="sb-empty">Nenhum link.</div>`;
+    else wl.forEach(m=>{const t=m.slice(2,-2),f=notes.find(n=>n.title.toLowerCase()===t.toLowerCase());h+=`<div class="bl-item" style="opacity:${f?1:.5};cursor:${f?"pointer":"default"}" data-id="${f?f.id:""}">${f?"→":"⊘"} ${t}</div>`;});
+    cont.innerHTML=h;
+    cont.querySelectorAll(".bl-item[data-id]").forEach(el=>{if(el.dataset.id)el.onclick=()=>openNote(el.dataset.id);});
+
+  } else {
+    const outline=note?note.content.split("\n").filter(l=>l.match(/^#{1,4}\s+/)).map(l=>{const m=l.match(/^(#{1,4})\s+(.+)/);return{level:m[1].length,text:m[2]};}) : [];
+    let h=`<div class="sb-sec">Estrutura</div>`;
+    if(!outline.length)h+=`<div class="sb-empty">Sem cabeçalhos.</div>`;
+    else outline.forEach(it=>{h+=`<div class="ol-item" style="padding-left:${(it.level-1)*12+8}px"><span style="color:var(--accent-dim);margin-right:4px;font-size:9px">${"#".repeat(it.level)}</span>${it.text}</div>`;});
+    cont.innerHTML=h;
+  }
+}
+
+// ── Build folder tree HTML — iterates node.items (pre-sorted, unified) ──
+function renderFolderTree(node, depth, folder){
+  const activeId=tabs[activeTab]?.noteId;
+  const pad=depth*14;
+  // folder.collapsed is the per-folder Set; fall back to global for compat
+  const collapsed=folder?.collapsed||collapsedFolders;
+  let html="";
+  for(const it of node.items){
+    if(it.kind==="note"){
+      const isActive=it.id===activeId;
+      const label=escHtml(it.filename||it.title);
+      html+=`<div class="ft-note${isActive?" on":""}" data-id="${it.id}" style="padding-left:${pad+20}px">
+        <span class="ft-note-title" title="${escHtml(it.relPath)}">${label}</span>
+        <button class="ft-note-del" data-del="${it.id}" title="Excluir">✕</button>
+      </div>`;
+    } else {
+      const child=it.node;
+      const isOpen=!collapsed.has(child.relPath);
+      html+=`<div class="ft-folder" data-folder="${escHtml(child.relPath)}" data-fid="${folder?.id||""}" style="padding-left:${pad+4}px">
+        <span class="ft-arrow${isOpen?" open":""}">▶</span>
+        <span class="ft-icon">${isOpen?"📂":"📁"}</span>
+        <span class="ft-label">${escHtml(child.name)}</span>
+      </div>
+      <div class="ft-children${isOpen?" open":""}" data-children="${escHtml(child.relPath)}">
+        ${renderFolderTree(child, depth+1, folder)}
+      </div>`;
+    }
+  }
+  return html;
+}
+
+// ── Bind events on the rendered tree ──
+function bindFolderTree(cont){
+  cont.querySelectorAll(".ft-note").forEach(el=>{
+    el.onclick=e=>{
+      const del=e.target.closest(".ft-note-del");
+      if(del){deleteNote(del.dataset.del);return;}
+      openNote(el.dataset.id);
+    };
+  });
+  cont.querySelectorAll(".ft-folder").forEach(el=>{
+    el.onclick=()=>{
+      const rp=el.dataset.folder;
+      const fid=el.dataset.fid;
+      const folder=openFolders.find(f=>f.id===fid);
+      const collapsed=folder?.collapsed||collapsedFolders;
+      if(collapsed.has(rp))collapsed.delete(rp);
+      else collapsed.add(rp);
+      renderSidebar();
+    };
+  });
+}
+
+function escHtml(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+// ══════════════════════════════════════════
+//  STATUS
+// ══════════════════════════════════════════
+// Cache para evitar recalcular backlinks quando a nota não mudou
+let _statusCache={noteId:null,bl:0};
+function renderStatus(){
+  const n=curNote(),c=n?n.content:"";
+  // Contagem de palavras: split simples é suficiente e rápido
+  const words=c?c.split(/\s+/).filter(Boolean).length:0;
+  // Backlinks: caro (percorre todas as notas), só recalcula quando a nota muda
+  let bl=0;
+  if(n){
+    if(n.id!==_statusCache.noteId){
+      const pat=`[[${n.title.toLowerCase()}]]`;
+      bl=notes.reduce((s,x)=>s+(x.id!==n.id&&x.content.toLowerCase().includes(pat)?1:0),0);
+      _statusCache={noteId:n.id,bl};
+    } else {
+      bl=_statusCache.bl;
+    }
+  }
+  document.getElementById("st-id").textContent=n?n.id:"";
+  document.getElementById("st-words").textContent=words+" palavras";
+  document.getElementById("st-chars").textContent=c.length+" chars";
+  document.getElementById("st-links").textContent=(c.match(/\[\[([^\]]+)\]\]/g)||[]).length+" links";
+  document.getElementById("st-backlinks").textContent=bl+" backlinks";
+  document.getElementById("st-total").textContent=notes.length+" notas";
+  document.getElementById("st-date").textContent=n?n.updated:"";
+}
+
+// ══════════════════════════════════════════
+//  NOTES CRUD
+// ══════════════════════════════════════════
+function createNote(title){
+  const id=genId(),t=tod();
+  const note={id,title,tags:[],created:t,updated:t,content:`---\ntitle: ${title}\nid: ${id}\ntags: []\ncreated: ${t}\n---\n\n# ${title}\n\n`};
+  notes.push(note);save();openNote(id);
+}
+function deleteNote(id){
+  if(!confirm("Excluir esta nota?"))return;
+  notes=notes.filter(n=>n.id!==id);
+  tabs=tabs.filter(t=>t.noteId!==id);
+  if(!tabs.length)tabs=[{noteId:notes[0]?.id||""}];
+  activeTab=Math.min(activeTab,tabs.length-1);
+  delete fileHandles[id];
+  save();renderTabs();renderEditor();renderSidebar();renderStatus();
+}
+// ── Tiered debounce timers ──
+// highlight : imediato via rAF (já debounced internamente)
+// preview   : 120 ms  — perceptível mas aceitável, pouco custoso no split view
+// save+status+sidebar : 600 ms — operações caras, não precisam de resposta imediata
+let _previewTimer=null;
+let _heavyTimer=null;
+
+function updateNote(content){
+  const n=curNote();if(!n)return;
+  n.content=content;
+  n.updated=tod();
+  setSaved(false,"● modificado");
+
+  // 1. Highlight — usa rAF interno, não bloqueia digitação
+  renderHighlight();
+
+  // 2. Preview — debounce curto: atualiza enquanto o usuário faz pausa breve
+  clearTimeout(_previewTimer);
+  _previewTimer=setTimeout(renderPreview, 120);
+
+  // 3. Save + Sidebar + Status — debounce longo: operações caras
+  //    localStorage.setItem é I/O síncrono; renderSidebar reconstrói DOM;
+  //    renderStatus percorre todas as notas para backlinks
+  clearTimeout(_heavyTimer);
+  _heavyTimer=setTimeout(()=>{
+    save();
+    renderStatus();
+    renderSidebar();
+  }, 600);
+}
+
+// ══════════════════════════════════════════
+//  MODALS
+// ══════════════════════════════════════════
+function openModal(id){
+  document.getElementById(id).classList.remove("hidden");
+  if(id==="modal-new"){const inp=document.getElementById("new-note-input");inp.value="";inp.focus();}
+  if(id==="modal-export"){const n=curNote();document.getElementById("export-title").textContent="Exportar"+(n?" — "+n.title:"");}
+  if(id==="modal-theme")renderThemeGrid();
+}
+function closeModal(id){document.getElementById(id).classList.add("hidden");}
+
+// ══════════════════════════════════════════
+//  VIEW / FOCUS
+// ══════════════════════════════════════════
+function setViewMode(vm){
+  viewMode=vm;
+  document.querySelectorAll(".vm-btn").forEach(b=>b.classList.toggle("on",b.dataset.vm===vm));
+  const ep=document.getElementById("editor-pane"),pp=document.getElementById("preview-pane"),ptb=document.getElementById("preview-toolbar");
+  if(vm==="editor"){ep.className="";pp.className="hidden";ptb.className="hidden";}
+  else if(vm==="preview"){pp.className="solo";ep.className="hidden";ptb.className="hidden";}
+  else{ep.className="";pp.className="";ptb.className="";}
+  // Sync mobile bottom nav indicator
+  if(isMobile()){
+    const map={"editor":"mn-editor","preview":"mn-preview","split":"mn-editor"};
+    setMobileTab(map[vm]||"mn-editor");
+  }
+}
+function setFocusMode(on){
+  focusMode=on;
+  document.getElementById("editor-area").classList.toggle("focus-mode",on);
+  document.getElementById("btn-focus").classList.toggle("on",on);
+  if(on)setViewMode("editor");else setViewMode("split");
+}
+
+// ══════════════════════════════════════════
+//  TOOLBAR INSERT
+// ══════════════════════════════════════════
+function insertFmt(fmt){
+  const ta=document.getElementById("editor"),s=ta.selectionStart,e=ta.selectionEnd,sel=ta.value.slice(s,e);
+  const map={bold:`**${sel||"texto"}**`,italic:`*${sel||"texto"}*`,strike:`~~${sel||"texto"}~~`,h1:`# ${sel||"Título"}`,h2:`## ${sel||"Título"}`,h3:`### ${sel||"Título"}`,quote:`> ${sel||""}`,hr:"\n---\n",wiki:`[[${sel||""}]]`};
+  const ins=map[fmt]||"";
+  ta.value=ta.value.slice(0,s)+ins+ta.value.slice(e);
+  ta.selectionStart=ta.selectionEnd=s+ins.length;
+  ta.focus();updateNote(ta.value);
+}
+
+// ══════════════════════════════════════════
+//  FILE SYSTEM — Open single/multiple files
+// ══════════════════════════════════════════
+async function loadFileHandle(handle,store){
+  const file=await handle.getFile();
+  const content=await file.text();
+  const title=file.name.replace(/\.(md|markdown|txt)$/i,"");
+  let note=notes.find(n=>n.title===title);
+  if(note){note.content=content;note.updated=tod();}
+  else{const id=genId(),t=tod();note={id,title,tags:[],created:t,updated:t,content};notes.push(note);}
+  if(store)fileHandles[note.id]=handle;
+  return note;
+}
+
+document.getElementById("btn-open").onclick=async()=>{
+  if(window.showOpenFilePicker){
+    try{
+      const handles=await window.showOpenFilePicker({multiple:true,types:[{description:"Markdown",accept:{"text/markdown":[".md",".markdown",".txt"]}}]});
+      for(const h of handles){const note=await loadFileHandle(h,true);openNote(note.id);}
+      save();renderSidebar();renderStatus();
+      setSaved(true);
+    }catch(e){if(e.name!=="AbortError")alert("Erro ao abrir: "+e.message);}
+  } else {
+    document.getElementById("file-open-input").click();
+  }
+};
+document.getElementById("file-open-input").onchange=async(e)=>{
+  for(const file of e.target.files){
+    const content=await file.text();
+    const title=file.name.replace(/\.(md|markdown|txt)$/i,"");
+    let note=notes.find(n=>n.title===title);
+    if(note){note.content=content;note.updated=tod();}
+    else{const id=genId(),t=tod();note={id,title,tags:[],created:t,updated:t,content};notes.push(note);}
+    openNote(note.id);
+  }
+  e.target.value="";
+  save();renderSidebar();renderStatus();
+  setSaved(true);
+};
+
+// ══════════════════════════════════════════
+//  FILE SYSTEM — Multi-folder management
+// ══════════════════════════════════════════
+
+async function readDirRecursive(dirHandle, relPath, folder){
+  const node={name:dirHandle.name, relPath, items:[]};
+  const entries=[];
+  for await(const [name,handle] of dirHandle.entries()) entries.push([name,handle]);
+  entries.sort(([na,ha],[nb,hb])=>{
+    if(ha.kind!==hb.kind) return ha.kind==="directory"?-1:1;
+    return na.localeCompare(nb,undefined,{sensitivity:"base"});
+  });
+  for(const [name,handle] of entries){
+    if(name.startsWith(".")) continue;
+    if(handle.kind==="directory"){
+      const childPath=relPath?relPath+"/"+name:name;
+      const child=await readDirRecursive(handle,childPath,folder);
+      if(countTreeItems(child)>0) node.items.push({kind:"folder",node:child});
+    } else if(/\.(md|markdown|txt)$/i.test(name)){
+      const fileRelPath=relPath?relPath+"/"+name:name;
+      try{
+        const file=await handle.getFile();
+        const content=await file.text();
+        const title=name.replace(/\.(md|markdown|txt)$/i,"");
+        const filename=name;
+        // ID scoped to folder to avoid collision across folders
+        const stableId="fp_"+folder.id+"_"+fileRelPath.replace(/[^a-z0-9]/gi,"_");
+        let note=notes.find(n=>n.id===stableId);
+        if(note){note.content=content;note.title=title;note.filename=filename;note.updated=tod();}
+        else{const t=tod();note={id:stableId,title,filename,tags:[],created:t,updated:t,content};notes.push(note);}
+        folder.fileHandles[fileRelPath]=handle;
+        folder.titleIndex[title.toLowerCase()]=fileRelPath;
+        node.items.push({kind:"note",title,filename,id:note.id,relPath:fileRelPath});
+      }catch(err){console.warn("Error reading",fileRelPath,err);}
+    }
+  }
+  return node;
+}
+
+function countTreeItems(node){
+  return node.items.reduce((s,it)=>s+(it.kind==="note"?1:countTreeItems(it.node)),0);
+}
+function firstNoteInTree(node){
+  for(const it of node.items){
+    if(it.kind==="note") return notes.find(n=>n.id===it.id)||null;
+    const f=firstNoteInTree(it.node);
+    if(f) return f;
+  }
+  return null;
+}
+
+async function loadFolder(handle){
+  if(!window.showDirectoryPicker){
+    alert("Seu navegador não suporta acesso a pastas (Chrome/Edge necessário).");
+    return 0;
+  }
+  // Check if this folder is already open (by name — handles can't be compared directly)
+  if(openFolders.find(f=>f.name===handle.name)){
+    // Reload it instead of adding duplicate
+    const existing=openFolders.find(f=>f.name===handle.name);
+    await reloadFolder(existing);
+    return countTreeItems(existing.tree||{items:[]});
+  }
+  const folder={
+    id:"f"+(_folderSeq++),
+    handle,
+    name:handle.name,
+    tree:null,
+    fileHandles:{},
+    titleIndex:{},
+    collapsed:new Set(),
+    headerCollapsed:false,
+  };
+  openFolders.push(folder);
+  folder.tree=await readDirRecursive(handle,"",folder);
+  const total=countTreeItems(folder.tree);
+  save();
+  if(total>0) openNote(firstNoteInTree(folder.tree)?.id||"");
+  updateFolderBar();
+  renderSidebar();renderStatus();
+  setSaved(true);
+  return total;
+}
+
+async function reloadFolder(folder){
+  if(!folder?.handle) return;
+  // Remove old notes for this folder from memory
+  const oldIds=new Set(Object.keys(folder.fileHandles).map(
+    rp=>"fp_"+folder.id+"_"+rp.replace(/[^a-z0-9]/gi,"_")
+  ));
+  const openTabIds=new Set(tabs.map(t=>t.noteId));
+  notes=notes.filter(n=>!oldIds.has(n.id)||openTabIds.has(n.id));
+  folder.fileHandles={};
+  folder.titleIndex={};
+  folder.tree=await readDirRecursive(folder.handle,"",folder);
+  save();
+  renderTabs();renderEditor();renderSidebar();renderStatus();
+  setSaved(true);
+}
+
+function closeFolder(fid){
+  const idx=openFolders.findIndex(f=>f.id===fid);
+  if(idx===-1) return;
+  const folder=openFolders[idx];
+  // Remove folder notes not open in a tab
+  const folderNoteIds=new Set(Object.keys(folder.fileHandles).map(
+    rp=>"fp_"+folder.id+"_"+rp.replace(/[^a-z0-9]/gi,"_")
+  ));
+  const openTabIds=new Set(tabs.map(t=>t.noteId));
+  notes=notes.filter(n=>!folderNoteIds.has(n.id)||openTabIds.has(n.id));
+  openFolders.splice(idx,1);
+  if(!tabs.length) tabs=[{noteId:notes[0]?.id||""}];
+  activeTab=Math.min(activeTab,tabs.length-1);
+  save();
+  updateFolderBar();
+  renderTabs();renderEditor();renderSidebar();renderStatus();
+}
+
+function updateFolderBar(){
+  // The old single folder-bar is no longer needed — hide it always.
+  // Folder controls are now embedded in the sidebar sections.
+  document.getElementById("folder-bar").classList.remove("visible");
+  document.getElementById("btn-folder").classList.toggle("folder-active", openFolders.length>0);
+}
+
+document.getElementById("btn-folder").onclick=async()=>{
+  if(!window.showDirectoryPicker){
+    alert("Seu navegador não suporta acesso a pastas (Chrome/Edge necessário).");
+    return;
+  }
+  try{
+    const handle=await window.showDirectoryPicker({mode:"readwrite"});
+    const loaded=await loadFolder(handle);
+    if(loaded===0) setSaved(false,"⚠ nenhum .md encontrado");
+    else setSaved(true,`✓ ${loaded} nota(s) carregada(s)`);
+  }catch(e){if(e.name!=="AbortError")alert("Erro ao abrir pasta: "+e.message);}
+};
+
+// Keep old sync/close buttons functional as no-ops (HTML still has them)
+document.getElementById("btn-folder-sync").onclick=async()=>{
+  for(const f of openFolders) await reloadFolder(f);
+  renderEditor();
+};
+document.getElementById("btn-folder-close").onclick=()=>{
+  // Close all folders
+  while(openFolders.length) closeFolder(openFolders[0].id);
+};
+
+// ══════════════════════════════════════════
+//  FILE SYSTEM — Save
+// ══════════════════════════════════════════
+async function saveNoteToFile(note, forceDialog){
+  if(!window.showSaveFilePicker){
+    // fallback: download
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob([note.content],{type:"text/markdown"}));
+    a.download=`${slugify(note.title)||"nota"}.md`;a.click();
+    setSaved(true);return;
+  }
+  try{
+    // Find handle: individual > any open folder > dialog
+    const titleIndex=_allTitleIndex();
+    const allFH=_allFileHandles();
+    const folderRelPath=titleIndex[note.title?.toLowerCase()];
+    let handle=fileHandles[note.id]||(folderRelPath?allFH[folderRelPath]:null);
+    if(!handle||forceDialog){
+      handle=await window.showSaveFilePicker({
+        suggestedName:`${slugify(note.title)||"nota"}.md`,
+        types:[{description:"Markdown",accept:{"text/markdown":[".md"]}}]
+      });
+      fileHandles[note.id]=handle;
+    }
+    const writable=await handle.createWritable();
+    await writable.write(note.content);
+    await writable.close();
+    setSaved(true);
+    renderTabs(); // refresh tab indicator
+  }catch(e){if(e.name!=="AbortError")alert("Erro ao salvar: "+e.message);}
+}
+
+document.getElementById("btn-save").onclick=async()=>{
+  const n=curNote();if(!n)return;
+  await saveNoteToFile(n,false);
+};
+document.getElementById("btn-save-as").onclick=async()=>{
+  const n=curNote();if(!n)return;
+  await saveNoteToFile(n,true);
+};
+
+// ══════════════════════════════════════════
+//  EVENTS
+// ══════════════════════════════════════════
+// ── Viewport height fix for Android Chrome (URL bar resize) ──
+// Android Chrome resizes the viewport when the URL bar shows/hides.
+// This sets --vh to the actual visible height, used as fallback.
+(function fixVh(){
+  function setVh(){
+    const vh=window.innerHeight*0.01;
+    document.documentElement.style.setProperty("--vh",vh+"px");
+  }
+  setVh();
+  window.addEventListener("resize",setVh);
+  // Also listen to visualViewport for Android soft-keyboard handling
+  if(window.visualViewport){
+    window.visualViewport.addEventListener("resize",setVh);
+  }
+})();
+const isMobile=()=>window.innerWidth<640;
+
+function openSidebarMobile(){
+  document.getElementById("sidebar").classList.add("open-mobile");
+  document.getElementById("sidebar-overlay").style.cssText="opacity:1;pointer-events:auto";
+  document.getElementById("mn-notes").classList.add("on");
+}
+function closeSidebarMobile(){
+  document.getElementById("sidebar").classList.remove("open-mobile");
+  document.getElementById("sidebar-overlay").style.cssText="opacity:0;pointer-events:none";
+  document.getElementById("mn-notes").classList.remove("on");
+}
+
+// Overlay tap closes sidebar
+document.getElementById("sidebar-overlay").onclick=closeSidebarMobile;
+
+// ── Sidebar toggle (desktop vs mobile behaviour) ──
+document.getElementById("btn-sidebar").onclick=()=>{
+  if(isMobile()){
+    const isOpen=document.getElementById("sidebar").classList.contains("open-mobile");
+    isOpen?closeSidebarMobile():openSidebarMobile();
+  } else {
+    sidebarOpen=!sidebarOpen;
+    document.getElementById("sidebar").classList.toggle("closed",!sidebarOpen);
+    document.getElementById("btn-sidebar").classList.toggle("on",sidebarOpen);
+  }
+};
+
+// ── Mobile bottom nav ──────────────────────────────────────
+function setMobileTab(active){
+  ["mn-notes","mn-editor","mn-preview","mn-save","mn-more"].forEach(id=>{
+    document.getElementById(id)?.classList.toggle("on",id===active);
+  });
+}
+
+document.getElementById("mn-notes").onclick=()=>{
+  const isOpen=document.getElementById("sidebar").classList.contains("open-mobile");
+  if(isOpen){closeSidebarMobile();setMobileTab("mn-editor");}
+  else{openSidebarMobile();setMobileTab("mn-notes");}
+};
+
+// On mobile, editor/preview are handled by the vm-grp buttons in the titlebar.
+// The bottom nav editor/preview buttons are kept as quick shortcuts that also close the sidebar.
+document.getElementById("mn-editor").onclick=()=>{
+  closeSidebarMobile();
+  setViewMode("editor");
+  setMobileTab("mn-editor");
+};
+
+document.getElementById("mn-preview").onclick=()=>{
+  closeSidebarMobile();
+  setViewMode("preview");
+  setMobileTab("mn-preview");
+};
+
+document.getElementById("mn-save").onclick=()=>{
+  const n=curNote();if(n)saveNoteToFile(n,false);
+  setMobileTab("mn-save");
+  setTimeout(()=>setMobileTab("mn-editor"),600);
+};
+
+document.getElementById("mn-more").onclick=()=>{
+  closeSidebarMobile();
+  openModal("modal-export");
+};
+
+// ── Adapt view mode when resizing across breakpoints ──
+let _lastWasMobile=isMobile();
+window.addEventListener("resize",()=>{
+  const nowMobile=isMobile();
+  if(nowMobile!==_lastWasMobile){
+    _lastWasMobile=nowMobile;
+    // Switching to mobile: close sidebar overlay artifacts
+    if(nowMobile){
+      document.getElementById("sidebar").classList.remove("closed");
+      closeSidebarMobile();
+      // Force single-pane if was in split
+      if(viewMode==="split") setViewMode("editor");
+    } else {
+      // Back to desktop: restore sidebar state
+      document.getElementById("sidebar").classList.toggle("closed",!sidebarOpen);
+    }
+  }
+});
+
+// ── Initial view mode is handled in INIT block below ──
+document.getElementById("btn-new").onclick=()=>openModal("modal-new");
+document.getElementById("btn-export").onclick=()=>openModal("modal-export");
+document.getElementById("btn-theme").onclick=()=>openModal("modal-theme");
+document.getElementById("btn-focus").onclick=()=>setFocusMode(!focusMode);
+document.getElementById("btn-new-cancel").onclick=()=>closeModal("modal-new");
+document.getElementById("btn-new-confirm").onclick=()=>{const t=document.getElementById("new-note-input").value.trim();if(t){createNote(t);closeModal("modal-new");}};
+document.getElementById("new-note-input").onkeydown=e=>{if(e.key==="Enter"){const t=e.target.value.trim();if(t){createNote(t);closeModal("modal-new");}}if(e.key==="Escape")closeModal("modal-new");};
+document.getElementById("btn-export-close").onclick=()=>closeModal("modal-export");
+document.querySelectorAll(".ex-opt").forEach(el=>el.onclick=()=>{
+  const n=curNote();
+  const fmt=el.dataset.fmt;
+  if(fmt==="site"){ closeModal("modal-export"); exportSiteZip(); }
+  else if(n){ doExport(n,fmt); closeModal("modal-export"); }
+});
+document.getElementById("btn-theme-close").onclick=()=>closeModal("modal-theme");
+document.querySelectorAll(".vm-btn").forEach(b=>b.onclick=()=>setViewMode(b.dataset.vm));
+document.querySelectorAll(".sb-tab").forEach(tab=>tab.onclick=()=>{
+  sidebarMode=tab.dataset.sb;
+  document.querySelectorAll(".sb-tab").forEach(t=>t.classList.toggle("on",t.dataset.sb===sidebarMode));
+  document.getElementById("sb-search").style.display=sidebarMode==="explorer"?"flex":"none";
+  renderSidebar();
+});
+document.getElementById("search-input").oninput=e=>{searchQuery=e.target.value;renderSidebar();};
+
+// Editor events
+const editorEl=document.getElementById("editor");
+editorEl.oninput=e=>updateNote(e.target.value);
+editorEl.onscroll=syncScroll;
+editorEl.onkeydown=e=>{
+  if(e.key==="Tab"){
+    e.preventDefault();
+    const ta=e.target,s=ta.selectionStart;
+    ta.value=ta.value.slice(0,s)+"  "+ta.value.slice(ta.selectionEnd);
+    ta.selectionStart=ta.selectionEnd=s+2;
+    updateNote(ta.value);
+  }
+  if(e.key==="Escape"&&focusMode)setFocusMode(false);
+  // Ctrl+S / Cmd+S
+  if((e.ctrlKey||e.metaKey)&&e.key==="s"){
+    e.preventDefault();
+    const n=curNote();if(n)saveNoteToFile(n,false);
+  }
+};
+document.querySelectorAll(".tbtn").forEach(b=>b.onclick=()=>insertFmt(b.dataset.fmt));
+document.getElementById("preview").onclick=e=>{
+  const el=e.target.closest(".wikilink");if(!el)return;
+  const id=el.dataset.noteid,title=el.dataset.title;
+  if(id){openNote(id);return;}
+  if(confirm(`Criar nova nota: "${title}"?`))createNote(title);
+};
+document.querySelectorAll(".overlay").forEach(ov=>ov.onclick=e=>{if(e.target===ov)ov.classList.add("hidden");});
+
+// ══════════════════════════════════════════
+//  PWA
+// ══════════════════════════════════════════
+//  PWA — Service Worker + Manifest
+//  Usa sw.js e manifest.json como arquivos separados
+//  (exigido pelo PWA Builder e pelas lojas de apps)
+// ══════════════════════════════════════════
+
+// ── Static manifest já está no <head> ────────────────────────────────────
+// <link rel="manifest" href="manifest.json"> é definido no HTML estático
+// (ver <head> acima). O bloco abaixo apenas adiciona meta tags extras.
+
+// theme-color meta para Android Chrome
+(function(){
+  const tm = document.createElement("meta");
+  tm.name = "theme-color"; tm.content = "#b8965a";
+  document.head.appendChild(tm);
+
+  // apple-touch-icon para iOS — usa o ícone gerado via Canvas
+  const c = document.createElement("canvas");
+  c.width = c.height = 180;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#141414"; ctx.fillRect(0,0,180,180);
+  ctx.fillStyle = "#b8965a"; ctx.fillRect(0,0,180,3);
+  ctx.font = "300 italic 76px Georgia,serif";
+  ctx.fillStyle = "#b8965a";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("Az", 90, 94);
+  const li = document.createElement("link");
+  li.rel = "apple-touch-icon"; li.href = c.toDataURL("image/png");
+  document.head.appendChild(li);
+})();
+
+// ── Service Worker ────────────────────────────────────────────────────────
+// Registra sw.js (arquivo separado no mesmo diretório)
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./sw.js", { scope: "./" })
+    .then(reg => reg.update().catch(() => {}))
+    .catch(err => console.warn("SW não registrado:", err));
+}
+
+// ── Install prompt ────────────────────────────────────────────────────────
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  installPromptEvent = e;
+  document.getElementById("install-bar").classList.add("visible");
+});
+window.addEventListener("appinstalled", () => {
+  document.getElementById("install-bar").classList.remove("visible");
+});
+document.getElementById("install-bar").onclick = () => {
+  if (installPromptEvent) {
+    installPromptEvent.prompt();
+    installPromptEvent = null;
+    document.getElementById("install-bar").classList.remove("visible");
+  }
+};
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+applyTheme(currentTheme);
+
+// Garante que sempre há pelo menos a nota de boas-vindas
+// (importante no Android WebView onde localStorage pode estar vazio)
+if(!notes||notes.length===0){
+  notes=DN.map(n=>({...n}));
+}
+// Garante que tabs aponta para uma nota existente
+if(!tabs.length||!notes.find(n=>n.id===tabs[0]?.noteId)){
+  tabs=[{noteId:notes[0]?.id||""}];
+  activeTab=0;
+}
+
+renderTabs();
+renderEditor();
+renderSidebar();
+renderStatus();
+
+// Modo de visualização inicial: split no desktop, editor no mobile/tablet
+setViewMode(isMobile()?"editor":"split");
+setSaved(true);
+</script>
+</body>
+</html>
