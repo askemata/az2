@@ -223,6 +223,146 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',ui-sans-serif,system
 .ex-ico{font-size:17px;flex-shrink:0}
 .ex-lbl{font-size:12px;color:var(--text-primary);font-family:'DM Sans',sans-serif;font-weight:500}
 .ex-dsc{font-size:10px;color:var(--text-muted);font-family:'DM Sans',sans-serif}
+/* ── Sidebar overlay (mobile drawer background) ── */
+#sidebar-overlay{
+  display:none;
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.4);
+  z-index:98;
+  transition:opacity .22s;
+}
+
+/* ── Tablet: 640–1024px ── */
+@media(max-width:1024px){
+  /* Esconde labels dos botões de ação, mantém ícones */
+  .tb-btn .btn-label{display:none}
+  /* Reduz padding da titlebar */
+  #titlebar{padding:0 6px;gap:2px}
+  .tb-btn{padding:4px 6px}
+  /* Preview padding menor */
+  #preview{padding:24px 28px}
+}
+
+/* ── Mobile: <640px ── */
+@media(max-width:639px){
+  /* Viewport fix para iOS/Android que não respeitam dvh corretamente */
+  #app{height:100svh;height:100dvh}
+
+  /* ── Titlebar: linha única com scroll horizontal ── */
+  #titlebar{
+    flex-wrap:nowrap;
+    height:38px;
+    padding:0 4px;
+    gap:1px;
+    overflow-x:auto;
+    overflow-y:hidden;
+  }
+  #titlebar::-webkit-scrollbar{display:none}
+  /* Logo menor */
+  .tb-logo{font-size:11px;letter-spacing:.03em}
+
+  /* Separadores somem */
+  .tb-sep{display:none}
+
+  /* ◎ Foco some no mobile */
+  #btn-focus{display:none}
+
+  /* ↓ᴬ Salvar Como some (ação rara no mobile) */
+  #btn-save-as{display:none}
+
+  /* Botões ficam menores */
+  .tb-btn{padding:3px 5px;font-size:10px;gap:1px}
+
+  /* Spacer empurra vm-grp + tema para a direita */
+  .tb-spacer{flex:1;min-width:4px}
+
+  /* View mode: mesma linha, compacto */
+  .vm-grp{
+    display:flex;
+    flex-shrink:0;
+    border-radius:3px;
+    overflow:hidden;
+  }
+  .vm-btn{
+    padding:3px 7px;
+    font-size:10px;
+    letter-spacing:.03em;
+  }
+  .vm-btn.on{background:var(--accent-glow);color:var(--accent)}
+
+  /* ── Tabs bar: rola horizontalmente ── */
+  #tabs-bar{min-height:28px}
+  .tab{height:28px;padding:0 8px;max-width:120px;font-size:10px}
+
+  /* ── Sidebar vira drawer overlay ── */
+  #sidebar{
+    position:fixed;
+    top:0; left:0; bottom:0;
+    z-index:99;
+    width:82vw!important;
+    max-width:300px;
+    transform:translateX(-100%);
+    transition:transform .22s ease, box-shadow .22s ease;
+    box-shadow:none;
+    border-right:1px solid var(--border);
+  }
+  #sidebar.open-mobile{
+    transform:translateX(0);
+    box-shadow:var(--shadow);
+  }
+  #sidebar.closed{
+    transform:translateX(-100%)!important;
+    width:82vw!important;
+  }
+
+  /* Overlay aparece quando sidebar está aberta */
+  #sidebar-overlay{display:block;opacity:0;pointer-events:none;transition:opacity .22s}
+  #sidebar.open-mobile~#sidebar-overlay,
+  body.sb-open #sidebar-overlay{opacity:1;pointer-events:auto}
+
+  /* ── Editor area: ocupa tudo ── */
+  #main{position:relative}
+  #editor-area{width:100%}
+
+  #editor-pane{flex:1}
+  #preview-pane{flex:1}
+
+  /* Editor: padding menor ── */
+  :root{--ed-pad-v:16px;--ed-pad-h:16px}
+
+  /* Preview: padding menor ── */
+  #preview{padding:18px 18px 80px}
+
+  /* ── Barra de status simplificada ── */
+  #statusbar{font-size:9px;padding:0 8px;gap:6px}
+  #st-chars,#st-links,#st-backlinks{display:none}
+  .st-sep:nth-of-type(n+3){display:none}
+
+  /* ── Bottom nav bar no mobile ── */
+  #mobile-nav{
+    display:flex;
+    background:var(--bg-secondary);
+    border-top:1px solid var(--border);
+    flex-shrink:0;
+  }
+  .mn-btn{
+    flex:1;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:2px;
+    padding:6px 0 5px;
+    border:none;background:transparent;
+    color:var(--text-muted);font-family:inherit;cursor:pointer;
+    font-size:8px;letter-spacing:.05em;text-transform:uppercase;
+    transition:color .15s;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .mn-btn .mn-ico{font-size:16px;line-height:1}
+  .mn-btn.on{color:var(--accent)}
+  .mn-btn:active{opacity:.7}
+}
+
+/* Desktop: bottom nav escondida */
+#mobile-nav{display:none}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
