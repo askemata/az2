@@ -2331,16 +2331,22 @@ document.getElementById("install-bar").onclick = () => {
 applyTheme(currentTheme);
 
 // ── Garante que as notas padrão existem sempre ──────────────────────────
-// Importante no Android onde localStorage pode ter notas de versões
-// anteriores que não incluem as notas padrão atuais.
-// Adiciona notas DN que estejam faltando sem apagar as existentes.
 if(!notes||notes.length===0){
   notes=DN.map(n=>({...n}));
 } else {
   // Merge: adiciona notas DN que não existem no localStorage
+  let addedWelcome=false;
   DN.forEach(dn=>{
-    if(!notes.find(n=>n.id===dn.id)) notes.unshift({...dn});
+    if(!notes.find(n=>n.id===dn.id)){
+      notes.unshift({...dn});
+      if(dn.id===DN[0].id) addedWelcome=true;
+    }
   });
+  // Se a nota de boas-vindas foi recém-adicionada, abrir em aba
+  if(addedWelcome){
+    tabs=[{noteId:DN[0].id}];
+    activeTab=0;
+  }
 }
 
 // ── Garante que tabs aponta para notas existentes ────────────────────────
@@ -2357,10 +2363,10 @@ renderSidebar();
 renderStatus();
 
 // ── Modo de visualização inicial ─────────────────────────────────────────
-// Primeira abertura (nota de boas-vindas ativa) → preview em qualquer device
+// Se a aba ativa for a nota de boas-vindas → abre em preview
 const _isWelcome = tabs[activeTab]?.noteId === DN[0]?.id;
-const _firstLaunch = !localStorage.getItem("askesis-launched") && _isWelcome;
-if(_firstLaunch){
+const _launched   = localStorage.getItem("askesis-launched");
+if(_isWelcome && !_launched){
   localStorage.setItem("askesis-launched","1");
   setViewMode("preview");
 } else {
