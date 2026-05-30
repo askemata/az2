@@ -70,9 +70,10 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',ui-sans-serif,system
 .tab.on::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent)}
 .tab:hover:not(.on){background:var(--bg-hover);color:var(--text-secondary)}
 .tab-name{overflow:hidden;text-overflow:ellipsis;pointer-events:none}
-.tab-x{opacity:.3;width:14px;height:14px;display:flex;align-items:center;justify-content:center;border-radius:3px;flex-shrink:0;font-size:14px;line-height:1;color:var(--text-muted);transition:opacity .1s}
-.tab.on .tab-x{opacity:.5}
-.tab:hover .tab-x{opacity:.7}
+.tab-x{opacity:.6;width:16px;height:16px;display:flex;align-items:center;justify-content:center;border-radius:3px;flex-shrink:0;font-size:15px;line-height:1;color:var(--text-secondary);transition:opacity .1s,background .1s}
+.tab.on .tab-x{opacity:.75;color:var(--text-primary)}
+.tab:hover .tab-x{opacity:.85}
+.tab-x:hover{opacity:1!important;color:var(--text-primary);background:var(--bg-tertiary)}
 .tab-x:hover{opacity:1!important;color:var(--text-primary)}
 #tab-new{padding:0 12px;height:32px;display:flex;align-items:center;cursor:pointer;color:var(--text-muted);font-size:18px;transition:color .1s;flex-shrink:0;line-height:1;background:none;border:none}
 #tab-new:hover{color:var(--accent)}
@@ -412,7 +413,7 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',ui-sans-serif,system
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 1.5v11M1.5 7h11" stroke="currentColor" stroke-width="1" opacity=".4"/><path d="M7 7a5.5 5.5 0 0 1-5.5 0A5.5 5.5 0 0 0 7 12.5V7Z" fill="currentColor" opacity=".3"/></svg>
     </button>
   </div>
-  <div id="tabs-bar"><button id="tab-new">+</button></div>
+  <div id="tabs-bar"><button id="tab-new" onclick="openModal('modal-new')">+</button></div>
   <div id="sidebar-overlay"></div>
   <div id="main">
     <div id="sidebar">
@@ -2329,29 +2330,38 @@ document.getElementById("install-bar").onclick = () => {
 // ══════════════════════════════════════════
 applyTheme(currentTheme);
 
-// Garante que sempre há pelo menos a nota de boas-vindas
-// (importante no Android WebView onde localStorage pode estar vazio)
+// ── Garante que as notas padrão existem sempre ──────────────────────────
+// Importante no Android onde localStorage pode ter notas de versões
+// anteriores que não incluem as notas padrão atuais.
+// Adiciona notas DN que estejam faltando sem apagar as existentes.
 if(!notes||notes.length===0){
   notes=DN.map(n=>({...n}));
+} else {
+  // Merge: adiciona notas DN que não existem no localStorage
+  DN.forEach(dn=>{
+    if(!notes.find(n=>n.id===dn.id)) notes.unshift({...dn});
+  });
 }
-// Garante que tabs aponta para uma nota existente
-if(!tabs.length||!notes.find(n=>n.id===tabs[0]?.noteId)){
-  tabs=[{noteId:notes[0]?.id||""}];
+
+// ── Garante que tabs aponta para notas existentes ────────────────────────
+tabs=tabs.filter(t=>notes.find(n=>n.id===t.noteId));
+if(!tabs.length){
+  tabs=[{noteId:notes[0].id}];
   activeTab=0;
 }
+activeTab=Math.min(activeTab,tabs.length-1);
 
 renderTabs();
 renderEditor();
 renderSidebar();
 renderStatus();
 
-// Modo de visualização inicial:
-// — Se for a primeira abertura (nota de boas-vindas ativa), abre em preview
-//   para que o conteúdo apareça imediatamente em qualquer dispositivo.
-// — Nas aberturas seguintes, usa split no desktop e editor no mobile.
-const _isWelcome = tabs[0]?.noteId === DN[0]?.id;
-const _firstLaunch = !localStorage.getItem("askesis-theme") && _isWelcome;
+// ── Modo de visualização inicial ─────────────────────────────────────────
+// Primeira abertura (nota de boas-vindas ativa) → preview em qualquer device
+const _isWelcome = tabs[activeTab]?.noteId === DN[0]?.id;
+const _firstLaunch = !localStorage.getItem("askesis-launched") && _isWelcome;
 if(_firstLaunch){
+  localStorage.setItem("askesis-launched","1");
   setViewMode("preview");
 } else {
   setViewMode(isMobile()?"editor":"split");
