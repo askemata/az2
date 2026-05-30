@@ -2345,8 +2345,17 @@ renderEditor();
 renderSidebar();
 renderStatus();
 
-// Modo de visualização inicial: split no desktop, editor no mobile/tablet
-setViewMode(isMobile()?"editor":"split");
+// Modo de visualização inicial:
+// — Se for a primeira abertura (nota de boas-vindas ativa), abre em preview
+//   para que o conteúdo apareça imediatamente em qualquer dispositivo.
+// — Nas aberturas seguintes, usa split no desktop e editor no mobile.
+const _isWelcome = tabs[0]?.noteId === DN[0]?.id;
+const _firstLaunch = !localStorage.getItem("askesis-theme") && _isWelcome;
+if(_firstLaunch){
+  setViewMode("preview");
+} else {
+  setViewMode(isMobile()?"editor":"split");
+}
 setSaved(true);
 </script>
 </body>
