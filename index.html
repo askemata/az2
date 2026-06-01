@@ -186,6 +186,18 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',ui-sans-serif,system
 .wikilink{cursor:pointer}
 .wikilink-exists{color:var(--link);text-decoration:underline;text-underline-offset:3px}
 .wikilink-missing{color:var(--text-muted);text-decoration:underline dashed;text-underline-offset:3px}
+/* #hashtag inline no preview */
+.inline-tag{
+  display:inline-block;
+  color:var(--accent);
+  background:var(--accent-glow);
+  border-radius:4px;
+  padding:0 5px;
+  font-size:.88em;
+  font-family:'DM Sans',sans-serif;
+  font-weight:500;
+  cursor:default;
+}
 .fn-ref{color:var(--link);text-decoration:none;font-size:.8em}
 .fn-ref:hover{text-decoration:underline}
 .fn-sep{margin:2.4em 0 1.2em;border-top:1px solid var(--border)}
@@ -608,6 +620,9 @@ function inline(text){
     const f=notes.find(n=>n.title.toLowerCase()===title.toLowerCase());
     return `<span class="wikilink ${f?"wikilink-exists":"wikilink-missing"}" data-noteid="${f?f.id:""}" data-title="${title}">${title}</span>`;
   });
+  // #hashtag — rendered as styled inline tag in preview
+  t=t.replace(/(?<![&\w])#([\w\u00C0-\u017E][\w\u00C0-\u017E\-]+)/g,
+    (_,tag)=>`<span class="inline-tag">#${tag}</span>`);
   t=t.replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>");
   t=t.replace(/__(.+?)__/g,"<strong>$1</strong>");
   t=t.replace(/\*(.+?)\*/g,"<em>$1</em>");
@@ -715,6 +730,11 @@ function hlInline(raw){
   // [[wikilink]] — must run before [link](url) to avoid partial matches
   t=t.replace(/\[\[([^\]]+)\]\]/g,
     (_,m)=>`<span style="color:var(--sh-wiki)">[[${m}]]</span>`);
+  // #hashtag — word boundary, not inside code, min 2 chars after #
+  // Matches #palavra, #multi-palavra, #palavra_com_sublinhado
+  // Does NOT match CSS colors (#fff), headings (#), or lone #
+  t=t.replace(/(?<![&\w])#([\w\u00C0-\u017E][\w\u00C0-\u017E\-]+)/g,
+    (_,tag)=>`<span style="color:var(--sh-list);font-weight:500">#${tag}</span>`);
   // `code` — run early so content inside is not further processed
   t=t.replace(/`([^`\n]+)`/g,
     (_,m)=>`<span style="color:var(--sh-code)">\`${m}\`</span>`);
@@ -1192,8 +1212,13 @@ a.note-tag:hover{background:#b8965a;color:#fff}
 
 function buildSiteNotePage(note, noteMap, backlinks, folderName){
   const bodyHtml = mdForSite(note.content, noteMap);
-  // A: tags → links to tag pages
-  const tags = (note.tags||[]).map(t=>
+  // Merge frontmatter tags + #hashtags from content
+  const bodyForHash = note.content.replace(/^---[\s\S]*?---\n?/,"");
+  const allTags = new Set(note.tags||[]);
+  for(const m of bodyForHash.matchAll(/(?<![&\w])#([\w\u00C0-\u017E][\w\u00C0-\u017E\-]+)/g)){
+    allTags.add(m[1]);
+  }
+  const tags = [...allTags].map(t=>
     `<a href="${tagSlug(t)}.html" class="note-tag">${t}</a>`
   ).join("");
   const blHtml = backlinks.length
@@ -1381,10 +1406,18 @@ async function exportSiteZip(){
   const folderGroups=[...groupMap.entries()].sort((a,b)=>(!a[0])?-1:(!b[0])?1:a[0].localeCompare(b[0]));
 
   // ── Build ZIP ─────────────────────────────────────────────────────
-  // A: Build tag → [notes] map
+  // Build tag → [notes] map from both frontmatter tags AND #hashtags in content
   const tagMap = new Map();
+  const _hashtagRe = /(?<![&\w])#([\w\u00C0-\u017E][\w\u00C0-\u017E\-]+)/g;
   siteNotes.forEach(n=>{
-    (n.tags||[]).forEach(t=>{
+    // 1. Frontmatter tags
+    const allTags = new Set(n.tags||[]);
+    // 2. #hashtags extracted from note body
+    const bodyForHash = n.content.replace(/^---[\s\S]*?---\n?/,""); // strip frontmatter
+    for(const m of bodyForHash.matchAll(_hashtagRe)){
+      allTags.add(m[1]); // add tag without the # prefix
+    }
+    allTags.forEach(t=>{
       if(!tagMap.has(t)) tagMap.set(t,[]);
       tagMap.get(t).push(n);
     });
