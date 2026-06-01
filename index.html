@@ -1425,10 +1425,12 @@ async function exportSiteZip(){
 //  THEME
 // ══════════════════════════════════════════
 function applyTheme(key){
+  if(!THEMES[key]) key="askesis-light";
   currentTheme=key;
   const v=THEMES[key].vars,r=document.documentElement;
   Object.entries(v).forEach(([k,val])=>r.style.setProperty(k,val));
-  document.getElementById("theme-color-meta").setAttribute("content",v["--bg-primary"]);
+  const meta=document.getElementById("theme-color-meta");
+  if(meta) meta.setAttribute("content",v["--bg-primary"]||"#ffffff");
   localStorage.setItem("askesis-theme",key);
   renderThemeGrid();
 }
@@ -2304,9 +2306,34 @@ document.querySelectorAll(".overlay").forEach(ov=>ov.onclick=e=>{if(e.target===o
 // o detecta (limitação do analisador, não do browser).
 // Registra sw.js (arquivo separado no mesmo diretório)
 if ("serviceWorker" in navigator) {
+  try {
+  const _isHttp = location.protocol==="http:"||location.protocol==="https:";
+  const _swCode = `
+const CACHE="askesis-zettel-v5";
+self.addEventListener("install",e=>self.skipWaiting());
+self.addEventListener("activate",e=>e.waitUntil(
+  caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k))))
+  .then(()=>self.clients.claim())
+));
+self.addEventListener("fetch",e=>{
+  if(e.request.method!=="GET")return;
+  const isSame=new URL(e.request.url).origin===self.location.origin;
+  if(isSame){
+    e.respondWith(caches.open(CACHE).then(c=>c.match(e.request).then(r=>{
+      if(r)return r;
+      return fetch(e.request).then(nr=>{c.put(e.request,nr.clone());return nr;});
+    })));
+  } else {
+    e.respondWith(fetch(e.request).then(r=>{
+      caches.open(CACHE).then(c=>c.put(e.request,r.clone()));return r;
+    }).catch(()=>caches.match(e.request)));
+  }
+});`;
+  const _swBlob = new Blob([_swCode],{type:"application/javascript"});
   navigator.serviceWorker.register(URL.createObjectURL(_swBlob), { scope: _isHttp ? "./" : undefined })
     .then(reg => reg.update().catch(() => {}))
-    .catch(err => console.warn("SW não registrado:", err));
+    .catch(() => {}); // blob: não suportado em alguns WebViews — silencioso
+  } catch(e) {} // try/catch para Android WebView
 }
 
 // ── Install prompt ────────────────────────────────────────────────────────
