@@ -621,7 +621,8 @@ function inline(text){
     return `<span class="wikilink ${f?"wikilink-exists":"wikilink-missing"}" data-noteid="${f?f.id:""}" data-title="${title}">${title}</span>`;
   });
   // #hashtag — rendered as styled inline tag in preview
-  t=t.replace(/(?<![&\w])#([\w\u00C0-\u017E][\w\u00C0-\u017E\-]+)/g,
+  // Lookbehind includes " to prevent matching href="#fn-1" attributes
+  t=t.replace(/(?<![&\w="])#([\w\u00C0-\u017E][\w\u00C0-\u017E\-]+)/g,
     (_,tag)=>`<span class="inline-tag">#${tag}</span>`);
   t=t.replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>");
   t=t.replace(/__(.+?)__/g,"<strong>$1</strong>");
@@ -1187,6 +1188,8 @@ sup a{color:#0070b7;text-decoration:none;font-size:.8em}
 .folder-section h2{font-size:1em;letter-spacing:.1em;text-transform:uppercase;color:#aaa;border-bottom:1px solid #eee;padding-bottom:.3em;margin:2em 0 .8em}
 footer{margin-top:4em;padding-top:1.2em;border-top:1px solid #eee;font-size:.8em;color:#aaa;text-align:center}
 footer a{color:#b8965a}
+.search-snippet{display:block;font-size:.82em;color:#6b7280;margin-top:3px;font-style:italic;line-height:1.5}
+.search-snippet mark{background:rgba(184,150,90,.25);color:#111;font-style:normal;border-radius:2px;padding:0 2px}
 .site-intro{margin-bottom:1.8em;padding-bottom:1.2em;border-bottom:1px solid #e8e4db}
 .site-intro p{text-align:justify;hyphens:auto}
 /* ── Tag cloud (index page) ── */
@@ -1210,7 +1213,8 @@ a.note-tag:hover{background:#b8965a;color:#fff}
 `.trim();
 }
 
-function buildSiteNotePage(note, noteMap, backlinks, folderName){
+function buildSiteNotePage(note, noteMap, backlinks, folderName, siteTitle){
+  siteTitle = siteTitle || "Askesis-Zettel";
   const bodyHtml = mdForSite(note.content, noteMap);
   // Merge frontmatter tags + #hashtags from content
   const bodyForHash = note.content.replace(/^---[\s\S]*?---\n?/,"");
@@ -1237,7 +1241,7 @@ function buildSiteNotePage(note, noteMap, backlinks, folderName){
 </head>
 <body>
 <nav class="site-nav">
-  <span class="nav-title">Askesis-Zettel</span>
+  <span class="nav-title">${siteTitle}</span>
   ${crumb}
   <a href="index.html">← Índice</a>
 </nav>
@@ -1259,9 +1263,21 @@ function buildSiteIndex(siteNotes, folderGroups, indexMeta, tagMap){
   const siteAuthor  = indexMeta?.author      || "";
   const introHtml   = indexMeta?.introHtml   || "";
 
+  // Strip markdown/frontmatter for search snippets — plain text only
+  const _stripMd = t => t
+    .replace(/^---[\s\S]*?---\n?/,"")           // frontmatter
+    .replace(/```[\s\S]*?```/g,"")              // code blocks
+    .replace(/#{1,6}\s/g,"")                    // headings
+    .replace(/\*\*|__|~~|\*|_/g,"")             // inline markers
+    .replace(/\[\[([^\]]+)\]\]/g,"$1")          // wikilinks
+    .replace(/\[([^\]]+)\]\([^)]+\)/g,"$1")     // links
+    .replace(/\n/g," ")
+    .replace(/\s+/g," ").trim();
+
   const noteData = JSON.stringify(siteNotes.map(n=>({
     slug:noteSlug(n.title), title:n.title,
     tags:n.tags||[], updated:n.updated||"",
+    body: _stripMd(n.content).slice(0,500),     // 500 chars for search
   })));
   const sections = folderGroups.map(([folder, fnotes])=>{
     const items = fnotes.map(n=>{
@@ -1326,9 +1342,14 @@ function filterNotes(q){
   const b=document.getElementById("idx-body");
   q=q.toLowerCase().trim();
   if(!q){b.innerHTML=${JSON.stringify(sections)};return;}
-  const m=_n.filter(n=>n.title.toLowerCase().includes(q)||n.tags.some(t=>t.toLowerCase().includes(q)));
+  const m=_n.filter(n=>n.title.toLowerCase().includes(q)||n.tags.some(t=>t.toLowerCase().includes(q))||(n.body&&n.body.toLowerCase().includes(q)));
   if(!m.length){b.innerHTML='<p style="color:#aaa;font-style:italic">Nenhuma nota encontrada.</p>';return;}
-  b.innerHTML='<ul class="note-list">'+m.map(n=>'<li><a href="'+n.slug+'.html">'+n.title+'</a>'+(n.tags.length?'<span class="note-tags-inline">'+n.tags.map(t=>'<a href="tag-'+t.toLowerCase().replace(/[^\w\-]/g,'')+'.html">'+t+'</a>').join(', ')+'</span>':'')+' <span class="note-meta">'+n.updated+'</span></li>').join('')+'</ul>';
+  const ql=q.toLowerCase();
+  b.innerHTML='<ul class="note-list">'+m.map(n=>{
+    const inBody=n.body&&n.body.toLowerCase().includes(ql);
+    const snippet=inBody?('<span class="search-snippet">'+n.body.slice(Math.max(0,n.body.toLowerCase().indexOf(ql)-40),n.body.toLowerCase().indexOf(ql)+80).replace(new RegExp(q,'gi'),t=>'<mark>'+t+'</mark>')+'…</span>'):'';
+    return '<li><a href="'+n.slug+'.html">'+n.title+'</a>'+(n.tags.length?'<span class="note-tags-inline">'+n.tags.map(t=>'<a href="tag-'+t.toLowerCase().replace(/[^\w\-]/g,'')+'.html">'+t+'</a>').join(', ')+'</span>':'')+' <span class="note-meta">'+n.updated+'</span>'+snippet+'</li>';
+  }).join('')+'</ul>';
 }
 <\/script>
 </body>
@@ -1432,7 +1453,7 @@ async function exportSiteZip(){
   siteNotes.forEach(n=>{
     zip.file(
       noteSlug(n.title)+".html",
-      buildSiteNotePage(n, noteMap, blMap.get(n.id)||[], folderNames.get(n.id)||"")
+      buildSiteNotePage(n, noteMap, blMap.get(n.id)||[], folderNames.get(n.id)||"", siteTitle)
     );
   });
 
