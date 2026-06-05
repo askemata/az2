@@ -124,6 +124,15 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',ui-sans-serif,system
 .fld-body{padding-bottom:4px}
 .fld-body.hidden{display:none}
 .fld-sep{height:1px;background:var(--border);margin:6px 4px}
+#tag-filter{display:none;flex-wrap:nowrap;gap:4px;padding:6px 8px;border-top:1px solid var(--border);background:var(--bg-secondary);overflow-x:auto;flex-shrink:0}
+#tag-filter::-webkit-scrollbar{height:3px}
+#tag-filter::-webkit-scrollbar-thumb{background:var(--border-med);border-radius:4px}
+#tag-filter.visible{display:flex}
+.tf-chip{font-size:10px;padding:2px 8px;border-radius:10px;background:var(--tag);color:var(--tag-text);cursor:pointer;border:1px solid transparent;font-family:'DM Sans',sans-serif;transition:all .1s;white-space:nowrap}
+.tf-chip:hover{border-color:var(--accent-dim)}
+.tf-chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.ni-snippet{font-size:10px;color:var(--text-muted);margin-top:2px;font-family:'DM Sans',sans-serif;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.ni-snippet mark{background:rgba(184,150,90,.25);color:var(--text-primary);border-radius:2px;padding:0 1px}
 .fld-internal-label{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);padding:8px 8px 4px;font-family:'DM Sans',sans-serif;font-weight:500}
 .ft-folder{display:flex;align-items:center;gap:4px;padding:3px 6px;border-radius:5px;cursor:pointer;user-select:none;color:var(--text-secondary);font-size:12px;font-family:'DM Sans',sans-serif;transition:all .1s}
 .ft-folder:hover{background:var(--bg-hover);color:var(--text-primary)}
@@ -439,6 +448,7 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',ui-sans-serif,system
         <div id="sb-search"><span class="search-ico">⌕</span><input type="text" placeholder="Buscar..." id="search-input"/></div>
         <div id="sb-content"></div>
       </div>
+      <div id="tag-filter"></div>
     </div>
     <div id="editor-area">
       <div id="editor-pane">
@@ -559,6 +569,7 @@ let sidebarMode="explorer";
 let sidebarOpen=true;
 let focusMode=false;
 let searchQuery="";
+let activeTagFilter="";
 let installPromptEvent=null;
 
 // File System handles: noteId → FileSystemFileHandle
@@ -600,6 +611,20 @@ function save(){try{localStorage.setItem("askesis-notes",JSON.stringify(notes));
 function curNote(){return notes.find(n=>n.id===tabs[activeTab]?.noteId);}
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 function slugify(t){return t.replace(/\s+/g,"-").replace(/[^\w\-]/g,"");}
+
+// Extrai trecho em volta do primeiro match de `q` no `text`, com <mark> no termo
+function makeSnippet(text, q){
+  if(!q||!text) return "";
+  const stripped=text.replace(/^---[\s\S]*?---\n/,"").replace(/#{1,6}\s/g,"").replace(/\*\*?|__?|~~|`/g,"");
+  const idx=stripped.toLowerCase().indexOf(q.toLowerCase());
+  if(idx===-1) return "";
+  const start=Math.max(0,idx-50);
+  const end=Math.min(stripped.length,idx+q.length+80);
+  const raw=(start>0?"…":"")+stripped.slice(start,end)+(end<stripped.length?"…":"");
+  // Highlight all occurrences of q (case-insensitive)
+  const re=new RegExp("("+q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+")","gi");
+  return raw.replace(re,"<mark>$1</mark>");
+}
 
 function setSaved(ok,msg){
   const el=document.getElementById("st-saved");
@@ -1637,29 +1662,71 @@ function renderPreview(){
 }
 
 // ══════════════════════════════════════════
+//  TAG FILTER
+// ══════════════════════════════════════════
+function renderTagFilter(){
+  const tf=document.getElementById("tag-filter");
+  const isExplorer=sidebarMode==="explorer";
+  if(!isExplorer){tf.className="";tf.innerHTML="";return;}
+  // Coletar todas as tags únicas de todas as notas
+  const tagSet=new Set();
+  notes.forEach(n=>{
+    // Tags do frontmatter
+    (n.tags||[]).forEach(t=>{if(t)tagSet.add(t);});
+    // Hashtags inline no conteúdo
+    const m=n.content.match(/(?<![&\w="])#([\w\u00C0-\u017E][\w\u00C0-\u017E\-]+)/g)||[];
+    m.forEach(t=>tagSet.add(t.slice(1)));
+  });
+  if(!tagSet.size){tf.className="";tf.innerHTML="";return;}
+  const sorted=[...tagSet].sort((a,b)=>a.localeCompare(b));
+  tf.className="visible";
+  tf.innerHTML=sorted.map(t=>
+    `<span class="tf-chip${activeTagFilter===t?" on":""}" data-tag="${escHtml(t)}">#${escHtml(t)}</span>`
+  ).join("");
+  tf.querySelectorAll(".tf-chip").forEach(chip=>chip.onclick=()=>{
+    activeTagFilter=activeTagFilter===chip.dataset.tag?"":chip.dataset.tag;
+    renderTagFilter();
+    renderSidebar();
+  });
+}
+
+// ══════════════════════════════════════════
 //  SIDEBAR
 // ══════════════════════════════════════════
 function renderSidebar(){
   const note=curNote();
   const cont=document.getElementById("sb-content");
   const q=searchQuery.toLowerCase();
+  renderTagFilter();
 
   if(sidebarMode==="explorer"){
     // ── Search mode: flat list across all notes ──
-    if(q){
-      const filtered=notes.filter(n=>
-        n.title.toLowerCase().includes(q)||
-        n.content.toLowerCase().includes(q)||
-        n.tags?.some(t=>t.toLowerCase().includes(q))
-      );
+    if(q||activeTagFilter){
+      let filtered=notes.filter(n=>{
+        const matchQ=!q||(
+          n.title.toLowerCase().includes(q)||
+          n.content.toLowerCase().includes(q)||
+          n.tags?.some(t=>t.toLowerCase().includes(q))
+        );
+        const matchTag=!activeTagFilter||(
+          n.tags?.some(t=>t===activeTagFilter)||
+          (n.content.match(/(?<![&\w="])#([\w\u00C0-\u017E][\w\u00C0-\u017E\-]+)/g)||[])
+            .some(t=>t.slice(1)===activeTagFilter)
+        );
+        return matchQ&&matchTag;
+      });
       if(!filtered.length){cont.innerHTML=`<div class="sb-empty">Nenhuma nota encontrada.</div>`;return;}
-      cont.innerHTML=filtered.map(n=>`
+      cont.innerHTML=filtered.map(n=>{
+        const snippet=q?makeSnippet(n.content,q):"";
+        return `
         <div class="ni${n.id===tabs[activeTab]?.noteId?" on":""}" data-id="${n.id}">
           <button class="ni-del" data-del="${n.id}">✕</button>
           <div class="ni-title">${n.filename?escHtml(n.filename):escHtml(n.title)}</div>
           <div class="ni-meta">${n.updated}</div>
+          ${snippet?`<div class="ni-snippet">${snippet}</div>`:""}
           ${n.tags?.length?`<div class="ni-tags">${n.tags.map(t=>`<span class="chip">${t}</span>`).join("")}</div>`:""}
-        </div>`).join("");
+        </div>`;
+      }).join("");
       cont.querySelectorAll(".ni").forEach(el=>el.onclick=e=>{
         if(e.target.dataset.del){deleteNote(e.target.dataset.del);return;}
         openNote(el.dataset.id);
@@ -2288,6 +2355,7 @@ document.getElementById("btn-theme-close").onclick=()=>closeModal("modal-theme")
 document.querySelectorAll(".vm-btn").forEach(b=>b.onclick=()=>setViewMode(b.dataset.vm));
 document.querySelectorAll(".sb-tab").forEach(tab=>tab.onclick=()=>{
   sidebarMode=tab.dataset.sb;
+  activeTagFilter="";
   document.querySelectorAll(".sb-tab").forEach(t=>t.classList.toggle("on",t.dataset.sb===sidebarMode));
   document.getElementById("sb-search").style.display=sidebarMode==="explorer"?"flex":"none";
   renderSidebar();
