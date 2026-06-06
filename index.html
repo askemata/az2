@@ -124,8 +124,8 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',ui-sans-serif,system
 .fld-body{padding-bottom:4px}
 .fld-body.hidden{display:none}
 .fld-sep{height:1px;background:var(--border);margin:6px 4px}
-#tag-filter{display:none;flex-wrap:nowrap;gap:4px;padding:6px 8px;border-top:1px solid var(--border);background:var(--bg-secondary);overflow-x:auto;flex-shrink:0}
-#tag-filter::-webkit-scrollbar{height:3px}
+#tag-filter{display:none;flex-wrap:wrap;gap:4px;padding:6px 8px;border-top:1px solid var(--border);background:var(--bg-secondary);overflow-y:auto;overflow-x:hidden;max-height:130px;flex-shrink:0;align-content:flex-start}
+#tag-filter::-webkit-scrollbar{width:3px}
 #tag-filter::-webkit-scrollbar-thumb{background:var(--border-med);border-radius:4px}
 #tag-filter.visible{display:flex}
 .tf-chip{font-size:10px;padding:2px 8px;border-radius:10px;background:var(--tag);color:var(--tag-text);cursor:pointer;border:1px solid transparent;font-family:'DM Sans',sans-serif;transition:all .1s;white-space:nowrap}
