@@ -124,6 +124,22 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',ui-sans-serif,system
 .fld-body{padding-bottom:4px}
 .fld-body.hidden{display:none}
 .fld-sep{height:1px;background:var(--border);margin:6px 4px}
+/* ── File Explorer ── */
+#fx-bar{display:flex;align-items:center;gap:6px;padding:8px 10px 4px;flex-shrink:0}
+#fx-bar button{font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid var(--border-med);background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer;font-family:'DM Sans',sans-serif}
+#fx-bar button:hover{background:var(--bg-active);color:var(--text-primary)}
+#fx-bar .fx-root-name{font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.fx-dir{display:flex;align-items:center;gap:4px;padding:3px 8px 3px 0;cursor:pointer;border-radius:4px;font-size:12px;color:var(--text-secondary);user-select:none}
+.fx-dir:hover{background:var(--bg-hover);color:var(--text-primary)}
+.fx-dir-arrow{display:inline-block;width:14px;text-align:center;font-size:10px;color:var(--text-muted);flex-shrink:0;transition:transform .15s}
+.fx-dir-arrow.open{transform:rotate(90deg)}
+.fx-dir-icon{flex-shrink:0;font-size:12px}
+.fx-children{overflow:hidden}
+.fx-file{display:flex;align-items:center;gap:4px;padding:3px 8px 3px 0;cursor:pointer;border-radius:4px;font-size:12px;color:var(--text-secondary);user-select:none}
+.fx-file:hover{background:var(--bg-hover);color:var(--text-primary)}
+.fx-file.on{background:var(--accent-glow);color:var(--accent)}
+.fx-file-icon{flex-shrink:0;font-size:11px;color:var(--text-muted)}
+.fx-file-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #tag-filter{display:none;flex-wrap:wrap;gap:4px;padding:6px 8px;border-top:1px solid var(--border);background:var(--bg-secondary);overflow-y:auto;overflow-x:hidden;max-height:130px;flex-shrink:0;align-content:flex-start}
 #tag-filter::-webkit-scrollbar{width:3px}
 #tag-filter::-webkit-scrollbar-thumb{background:var(--border-med);border-radius:4px}
@@ -440,6 +456,7 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',ui-sans-serif,system
     <div id="sidebar">
       <div id="sb-header">
         <div class="sb-tab on" data-sb="explorer">Notas</div>
+        <div class="sb-tab" data-sb="files">Arquivos</div>
         <div class="sb-tab" data-sb="backlinks">Links</div>
         <div class="sb-tab" data-sb="outline">Índice</div>
       </div>
@@ -570,6 +587,10 @@ let sidebarOpen=true;
 let focusMode=false;
 let searchQuery="";
 let activeTagFilter="";
+// File Explorer state
+let fxRootHandle=null;   // DirectoryFileSystemHandle da pasta raiz
+let fxTree=null;         // árvore {name, kind, handle, children[]}
+let fxExpanded=new Set();// paths expandidos
 let installPromptEvent=null;
 
 // File System handles: noteId → FileSystemFileHandle
@@ -608,7 +629,12 @@ function _allTitleIndex(){
 function genId(){const n=new Date();return n.getFullYear()+String(n.getMonth()+1).padStart(2,"0")+String(n.getDate()).padStart(2,"0")+String(n.getHours()).padStart(2,"0")+String(n.getMinutes()).padStart(2,"0");}
 function tod(){return new Date().toISOString().slice(0,10);}
 function save(){try{localStorage.setItem("askesis-notes",JSON.stringify(notes));}catch{}}
-function curNote(){return notes.find(n=>n.id===tabs[activeTab]?.noteId);}
+function curNote(){
+  const tab=tabs[activeTab];
+  if(!tab) return null;
+  if(tab.type==="file") return {id:null, title:tab.title, content:tab.content||"", _fileTab:true};
+  return notes.find(n=>n.id===tab.noteId);
+}
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 function slugify(t){return t.replace(/\s+/g,"-").replace(/[^\w\-]/g,"");}
 
@@ -1531,12 +1557,19 @@ function renderThemeGrid(){
 function renderTabs(){
   const bar=document.getElementById("tabs-bar");bar.innerHTML="";
   tabs.forEach((tab,idx)=>{
-    const note=notes.find(n=>n.id===tab.noteId);
     const d=document.createElement("div");
     d.className="tab"+(activeTab===idx?" on":"");
-    // show folder icon if note has a folder handle
-    const hasFh=note&&(fileHandles[note.id]||_allTitleIndex()[note.title?.toLowerCase()]);
-    d.innerHTML=`<span class="tab-name">${hasFh?"📄 ":""}${note?note.title:"Sem título"}</span><span class="tab-x">×</span>`;
+    let label, icon="";
+    if(tab.type==="file"){
+      label=tab.title||tab.path||"Arquivo";
+      icon="📄 ";
+    } else {
+      const note=notes.find(n=>n.id===tab.noteId);
+      label=note?note.title:"Sem título";
+      const hasFh=note&&(fileHandles[note.id]||_allTitleIndex()[note.title?.toLowerCase()]);
+      if(hasFh) icon="📄 ";
+    }
+    d.innerHTML=`<span class="tab-name">${icon}${escHtml(label)}</span><span class="tab-x">×</span>`;
     d.onclick=(e)=>{if(e.target.classList.contains("tab-x")){closeTab(idx);return;}setActiveTab(idx);};
     bar.appendChild(d);
   });
@@ -1662,6 +1695,137 @@ function renderPreview(){
 }
 
 // ══════════════════════════════════════════
+//  FILE EXPLORER
+// ══════════════════════════════════════════
+async function fxReadTree(dirHandle, path=""){
+  const node={name:dirHandle.name, kind:"dir", handle:dirHandle, path, children:[]};
+  for await(const [name, handle] of dirHandle.entries()){
+    if(name.startsWith(".")) continue;
+    const childPath=path?path+"/"+name:name;
+    if(handle.kind==="directory"){
+      node.children.push(await fxReadTree(handle, childPath));
+    } else if(/\.(md|markdown|txt)$/i.test(name)){
+      node.children.push({name, kind:"file", handle, path:childPath});
+    }
+  }
+  // dirs first, then files, both alphabetical
+  node.children.sort((a,b)=>{
+    if(a.kind!==b.kind) return a.kind==="dir"?-1:1;
+    return a.name.localeCompare(b.name);
+  });
+  return node;
+}
+
+// Abre um arquivo externo numa tab {type:"file"}
+async function fxOpenFile(node){
+  // Verifica se já existe tab para este path
+  const existing=tabs.findIndex(t=>t.type==="file"&&t.path===node.path);
+  if(existing>=0){activeTab=existing;renderTabs();renderEditor();return;}
+  const file=await node.handle.getFile();
+  const content=await file.text();
+  const title=node.name.replace(/\.(md|markdown|txt)$/i,"");
+  tabs.push({type:"file", fileHandle:node.handle, path:node.path, title, content});
+  activeTab=tabs.length-1;
+  renderTabs();renderEditor();renderSidebar();renderStatus();
+}
+
+function renderFxTree(node, depth=0){
+  if(node.kind==="file"){
+    const activePath=tabs[activeTab]?.path;
+    const isOn=tabs[activeTab]?.type==="file"&&activePath===node.path;
+    const indent=(depth*14)+"px";
+    return `<div class="fx-file${isOn?" on":""}" data-fxpath="${escHtml(node.path)}" style="padding-left:calc(${indent} + 8px)">
+      <span class="fx-file-icon">◦</span>
+      <span class="fx-file-name">${escHtml(node.name)}</span>
+    </div>`;
+  }
+  if(node.kind==="dir" && depth===0){
+    // Raiz: só renderiza filhos
+    return node.children.map(c=>renderFxTree(c, depth)).join("");
+  }
+  const isOpen=fxExpanded.has(node.path);
+  const indent=(depth*14)+"px";
+  const childrenHtml=isOpen?node.children.map(c=>renderFxTree(c, depth+1)).join(""):"";
+  return `<div class="fx-dir" data-fxdir="${escHtml(node.path)}" style="padding-left:calc(${indent} + 8px)">
+    <span class="fx-dir-arrow${isOpen?" open":""}" aria-hidden="true">▶</span>
+    <span class="fx-dir-icon">📁</span>
+    <span>${escHtml(node.name)}</span>
+  </div>
+  <div class="fx-children"${isOpen?"":" style='display:none'"}>
+    ${childrenHtml}
+  </div>`;
+}
+
+function renderFileExplorer(){
+  const cont=document.getElementById("sb-content");
+  // Barra superior
+  document.getElementById("sb-search").style.display="none";
+  document.getElementById("tag-filter").className="";
+  document.getElementById("tag-filter").innerHTML="";
+  // fx-bar: mostrar sempre no modo files
+  let fxBar=document.getElementById("fx-bar");
+  if(!fxBar){
+    fxBar=document.createElement("div");
+    fxBar.id="fx-bar";
+    document.getElementById("sb-body").insertBefore(fxBar, cont);
+  }
+  fxBar.style.display="flex";
+  fxBar.innerHTML=fxRootHandle
+    ?`<span class="fx-root-name" title="${escHtml(fxRootHandle.name)}">📂 ${escHtml(fxRootHandle.name)}</span>
+       <button id="fx-reload">↺</button>
+       <button id="fx-close">✕</button>`
+    :`<button id="fx-open-btn">Abrir pasta…</button>`;
+  // Bind
+  document.getElementById("fx-open-btn")?.addEventListener("click", fxPickFolder);
+  document.getElementById("fx-reload")?.addEventListener("click", async()=>{
+    if(!fxRootHandle) return;
+    fxTree=await fxReadTree(fxRootHandle);
+    renderFileExplorer();
+  });
+  document.getElementById("fx-close")?.addEventListener("click",()=>{
+    fxRootHandle=null; fxTree=null; fxExpanded.clear();
+    renderFileExplorer();
+  });
+  // Árvore
+  if(!fxTree){cont.innerHTML=`<div class="sb-empty">Nenhuma pasta aberta.</div>`;return;}
+  cont.innerHTML=renderFxTree(fxTree);
+  cont.querySelectorAll(".fx-dir").forEach(el=>{
+    el.onclick=()=>{
+      const p=el.dataset.fxdir;
+      fxExpanded.has(p)?fxExpanded.delete(p):fxExpanded.add(p);
+      renderFileExplorer();
+    };
+  });
+  cont.querySelectorAll(".fx-file").forEach(el=>{
+    el.onclick=async()=>{
+      const p=el.dataset.fxpath;
+      const node=fxFindNode(fxTree,p);
+      if(node) await fxOpenFile(node);
+    };
+  });
+}
+
+function fxFindNode(node, path){
+  if(node.path===path) return node;
+  for(const c of node.children||[]){
+    const found=fxFindNode(c,path);
+    if(found) return found;
+  }
+  return null;
+}
+
+async function fxPickFolder(){
+  if(!window.showDirectoryPicker){alert("Chrome/Edge necessário.");return;}
+  try{
+    const handle=await window.showDirectoryPicker({mode:"read"});
+    fxRootHandle=handle;
+    fxTree=await fxReadTree(handle);
+    fxExpanded.clear();
+    renderFileExplorer();
+  }catch(e){if(e.name!=="AbortError")alert("Erro: "+e.message);}
+}
+
+// ══════════════════════════════════════════
 //  TAG FILTER
 // ══════════════════════════════════════════
 function renderTagFilter(){
@@ -1697,7 +1861,11 @@ function renderSidebar(){
   const note=curNote();
   const cont=document.getElementById("sb-content");
   const q=searchQuery.toLowerCase();
+  // Ocultar fx-bar fora do modo files
+  const fxBar=document.getElementById("fx-bar");
+  if(fxBar) fxBar.style.display=sidebarMode==="files"?"flex":"none";
   renderTagFilter();
+  if(sidebarMode==="files"){renderFileExplorer();return;}
 
   if(sidebarMode==="explorer"){
     // ── Search mode: flat list across all notes ──
@@ -1935,6 +2103,17 @@ let _previewTimer=null;
 let _heavyTimer=null;
 
 function updateNote(content){
+  const tab=tabs[activeTab];
+  if(!tab) return;
+  // Tab de arquivo externo: guarda conteúdo na própria tab
+  if(tab.type==="file"){
+    tab.content=content;
+    setSaved(false,"● modificado");
+    renderHighlight();
+    clearTimeout(_previewTimer);
+    _previewTimer=setTimeout(renderPreview, 120);
+    return;
+  }
   const n=curNote();if(!n)return;
   n.content=content;
   n.updated=tod();
@@ -2224,14 +2403,24 @@ async function saveNoteToFile(note, forceDialog){
   }catch(e){if(e.name!=="AbortError")alert("Erro ao salvar: "+e.message);}
 }
 
-document.getElementById("btn-save").onclick=async()=>{
-  const n=curNote();if(!n)return;
-  await saveNoteToFile(n,false);
-};
-document.getElementById("btn-save-as").onclick=async()=>{
-  const n=curNote();if(!n)return;
-  await saveNoteToFile(n,true);
-};
+async function saveActiveTab(forceDialog=false){
+  const tab=tabs[activeTab];
+  if(!tab) return;
+  if(tab.type==="file"){
+    try{
+      const writable=await tab.fileHandle.createWritable();
+      await writable.write(tab.content||"");
+      await writable.close();
+      setSaved(true);
+    }catch(e){if(e.name!=="AbortError")alert("Erro ao salvar: "+e.message);}
+    return;
+  }
+  const n=curNote();
+  if(n) await saveNoteToFile(n,forceDialog);
+}
+
+document.getElementById("btn-save").onclick=async()=>saveActiveTab(false);
+document.getElementById("btn-save-as").onclick=async()=>saveActiveTab(true);
 
 // ══════════════════════════════════════════
 //  EVENTS
@@ -2307,7 +2496,7 @@ document.getElementById("mn-preview").onclick=()=>{
 };
 
 document.getElementById("mn-save").onclick=()=>{
-  const n=curNote();if(n)saveNoteToFile(n,false);
+  saveActiveTab(false);
   setMobileTab("mn-save");
   setTimeout(()=>setMobileTab("mn-editor"),600);
 };
@@ -2366,7 +2555,7 @@ document.getElementById("search-input").oninput=e=>{searchQuery=e.target.value;r
 const editorEl=document.getElementById("editor");
 editorEl.oninput=e=>updateNote(e.target.value);
 editorEl.onscroll=syncScroll;
-editorEl.onkeydown=e=>{
+editorEl.onkeydown=async e=>{
   if(e.key==="Tab"){
     e.preventDefault();
     const ta=e.target,s=ta.selectionStart;
@@ -2378,7 +2567,7 @@ editorEl.onkeydown=e=>{
   // Ctrl+S / Cmd+S
   if((e.ctrlKey||e.metaKey)&&e.key==="s"){
     e.preventDefault();
-    const n=curNote();if(n)saveNoteToFile(n,false);
+    await saveActiveTab(false);
   }
 };
 document.querySelectorAll(".tbtn").forEach(b=>b.onclick=()=>insertFmt(b.dataset.fmt));
