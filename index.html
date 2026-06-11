@@ -2419,6 +2419,9 @@ async function saveActiveTab(forceDialog=false){
   if(!tab) return;
   if(tab.type==="file"){
     try{
+      // Verificar/renovar permissão de escrita (necessário em mobile após suspensão)
+      const perm=await tab.fileHandle.requestPermission({mode:"readwrite"});
+      if(perm!=="granted"){alert("Permissão de escrita negada.");return;}
       const writable=await tab.fileHandle.createWritable();
       await writable.write(tab.content||"");
       await writable.close();
@@ -2579,6 +2582,29 @@ editorEl.onkeydown=async e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==="s"){
     e.preventDefault();
     await saveActiveTab(false);
+  }
+  // Atalhos de formatação
+  if(e.ctrlKey||e.metaKey){
+    const ta=e.target;
+    const s=ta.selectionStart,end=ta.selectionEnd,sel=ta.value.slice(s,end);
+    let ins=null,cursor=null;
+    if(e.key==="b"){ins=`**${sel||"texto"}**`;cursor=sel?s+ins.length:s+2;}
+    else if(e.key==="i"&&!e.shiftKey){ins=`*${sel||"texto"}*`;cursor=sel?s+ins.length:s+1;}
+    else if(e.key==="k"&&!e.shiftKey){
+      ins=`[${sel||"texto"}](url)`;
+      cursor=s+(sel||"texto").length+3; // posiciona em "url"
+    }
+    else if(e.key==="`"&&!e.shiftKey){ins=`\`${sel||"código"}\``;cursor=sel?s+ins.length:s+1;}
+    else if(e.key==="`"&&e.shiftKey){
+      ins=`\`\`\`\n${sel||""}\n\`\`\``;
+      cursor=sel?s+ins.length:s+4;
+    }
+    if(ins!==null){
+      e.preventDefault();
+      ta.value=ta.value.slice(0,s)+ins+ta.value.slice(end);
+      ta.selectionStart=ta.selectionEnd=cursor;
+      ta.focus();updateNote(ta.value);
+    }
   }
 };
 document.querySelectorAll(".tbtn").forEach(b=>b.onclick=()=>insertFmt(b.dataset.fmt));
