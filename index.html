@@ -1729,31 +1729,55 @@ async function fxOpenFile(node){
   renderTabs();renderEditor();renderSidebar();renderStatus();
 }
 
-function renderFxTree(node, depth=0){
-  if(node.kind==="file"){
-    const activePath=tabs[activeTab]?.path;
-    const isOn=tabs[activeTab]?.type==="file"&&activePath===node.path;
-    const indent=(depth*14)+"px";
-    return `<div class="fx-file${isOn?" on":""}" data-fxpath="${escHtml(node.path)}" style="padding-left:calc(${indent} + 8px)">
-      <span class="fx-file-icon">◦</span>
-      <span class="fx-file-name">${escHtml(node.name)}</span>
-    </div>`;
-  }
+function buildFxTree(node, depth, container){
   if(node.kind==="dir" && depth===0){
-    // Raiz: só renderiza filhos
-    return node.children.map(c=>renderFxTree(c, depth)).join("");
+    // Raiz: renderiza filhos diretos sem mostrar o nó raiz
+    node.children.forEach(c=>buildFxTree(c, 0, container));
+    return;
   }
-  const isOpen=fxExpanded.has(node.path);
-  const indent=(depth*14)+"px";
-  const childrenHtml=isOpen?node.children.map(c=>renderFxTree(c, depth+1)).join(""):"";
-  return `<div class="fx-dir" data-fxdir="${escHtml(node.path)}" style="padding-left:calc(${indent} + 8px)">
-    <span class="fx-dir-arrow${isOpen?" open":""}" aria-hidden="true">▶</span>
-    <span class="fx-dir-icon">📁</span>
-    <span>${escHtml(node.name)}</span>
-  </div>
-  <div class="fx-children"${isOpen?"":" style='display:none'"}>
-    ${childrenHtml}
-  </div>`;
+  if(node.kind==="dir"){
+    const isOpen=fxExpanded.has(node.path);
+    // Linha da pasta
+    const row=document.createElement("div");
+    row.className="fx-dir";
+    row.dataset.fxdir=node.path;
+    row.style.paddingLeft=(depth*14+4)+"px";
+    row.innerHTML=`<span class="fx-dir-arrow${isOpen?" open":""}">▶</span><span class="fx-dir-icon">📁</span><span class="fx-dir-name">${escHtml(node.name)}</span>`;
+    container.appendChild(row);
+    // Bloco de filhos
+    const childBlock=document.createElement("div");
+    childBlock.className="fx-children";
+    if(!isOpen) childBlock.style.display="none";
+    container.appendChild(childBlock);
+    if(isOpen){
+      node.children.forEach(c=>buildFxTree(c, depth+1, childBlock));
+    }
+    // Toggle expand/collapse
+    row.onclick=()=>{
+      if(fxExpanded.has(node.path)){
+        fxExpanded.delete(node.path);
+        row.querySelector(".fx-dir-arrow").classList.remove("open");
+        childBlock.style.display="none";
+        childBlock.innerHTML="";
+      } else {
+        fxExpanded.add(node.path);
+        row.querySelector(".fx-dir-arrow").classList.add("open");
+        childBlock.style.display="";
+        node.children.forEach(c=>buildFxTree(c, depth+1, childBlock));
+      }
+    };
+    return;
+  }
+  if(node.kind==="file"){
+    const isOn=tabs[activeTab]?.type==="file"&&tabs[activeTab]?.path===node.path;
+    const row=document.createElement("div");
+    row.className="fx-file"+(isOn?" on":"");
+    row.dataset.fxpath=node.path;
+    row.style.paddingLeft=(depth*14+4)+"px";
+    row.innerHTML=`<span class="fx-file-icon">◦</span><span class="fx-file-name">${escHtml(node.name)}</span>`;
+    row.onclick=async()=>{ await fxOpenFile(node); };
+    container.appendChild(row);
+  }
 }
 
 function renderFileExplorer(){
@@ -1788,21 +1812,8 @@ function renderFileExplorer(){
   });
   // Árvore
   if(!fxTree){cont.innerHTML=`<div class="sb-empty">Nenhuma pasta aberta.</div>`;return;}
-  cont.innerHTML=renderFxTree(fxTree);
-  cont.querySelectorAll(".fx-dir").forEach(el=>{
-    el.onclick=()=>{
-      const p=el.dataset.fxdir;
-      fxExpanded.has(p)?fxExpanded.delete(p):fxExpanded.add(p);
-      renderFileExplorer();
-    };
-  });
-  cont.querySelectorAll(".fx-file").forEach(el=>{
-    el.onclick=async()=>{
-      const p=el.dataset.fxpath;
-      const node=fxFindNode(fxTree,p);
-      if(node) await fxOpenFile(node);
-    };
-  });
+  cont.innerHTML="";
+  buildFxTree(fxTree, 0, cont);
 }
 
 function fxFindNode(node, path){
