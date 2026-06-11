@@ -2414,19 +2414,47 @@ async function saveNoteToFile(note, forceDialog){
   }catch(e){if(e.name!=="AbortError")alert("Erro ao salvar: "+e.message);}
 }
 
+// Resolve um fileHandle fresco navegando pela árvore de diretórios
+async function fxResolveHandle(path){
+  if(!fxRootHandle) return null;
+  const parts=path.split("/");
+  let dir=fxRootHandle;
+  for(let i=0;i<parts.length-1;i++){
+    try{ dir=await dir.getDirectoryHandle(parts[i]); }
+    catch(e){ return null; }
+  }
+  try{ return await dir.getFileHandle(parts[parts.length-1]); }
+  catch(e){ return null; }
+}
+
+async function fxWriteHandle(handle, content){
+  const perm=await handle.requestPermission({mode:"readwrite"});
+  if(perm!=="granted") throw new Error("Permissão de escrita negada.");
+  const writable=await handle.createWritable();
+  await writable.write(content);
+  await writable.close();
+}
+
 async function saveActiveTab(forceDialog=false){
   const tab=tabs[activeTab];
   if(!tab) return;
   if(tab.type==="file"){
     try{
-      // Verificar/renovar permissão de escrita (necessário em mobile após suspensão)
-      const perm=await tab.fileHandle.requestPermission({mode:"readwrite"});
-      if(perm!=="granted"){alert("Permissão de escrita negada.");return;}
-      const writable=await tab.fileHandle.createWritable();
-      await writable.write(tab.content||"");
-      await writable.close();
+      await fxWriteHandle(tab.fileHandle, tab.content||"");
       setSaved(true);
-    }catch(e){if(e.name!=="AbortError")alert("Erro ao salvar: "+e.message);}
+    }catch(e){
+      if(e.name==="AbortError") return;
+      // Handle inválido (suspensão no Android) — resolver pela árvore
+      try{
+        const fresh=await fxResolveHandle(tab.path);
+        if(!fresh) throw new Error("Não foi possível localizar o arquivo na árvore.");
+        tab.fileHandle=fresh; // atualiza o handle na tab
+        await fxWriteHandle(fresh, tab.content||"");
+        setSaved(true);
+      }catch(e2){
+        if(e2.name!=="AbortError") alert("Erro ao salvar: "+e2.message);
+      }
+    }
     return;
   }
   const n=curNote();
