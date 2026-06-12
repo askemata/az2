@@ -124,22 +124,6 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',ui-sans-serif,system
 .fld-body{padding-bottom:4px}
 .fld-body.hidden{display:none}
 .fld-sep{height:1px;background:var(--border);margin:6px 4px}
-/* ── File Explorer ── */
-#fx-bar{display:flex;align-items:center;gap:6px;padding:8px 10px 4px;flex-shrink:0}
-#fx-bar button{font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid var(--border-med);background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer;font-family:'DM Sans',sans-serif}
-#fx-bar button:hover{background:var(--bg-active);color:var(--text-primary)}
-#fx-bar .fx-root-name{font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
-.fx-dir{display:flex;align-items:center;gap:4px;padding:3px 8px 3px 0;cursor:pointer;border-radius:4px;font-size:12px;color:var(--text-secondary);user-select:none}
-.fx-dir:hover{background:var(--bg-hover);color:var(--text-primary)}
-.fx-dir-arrow{display:inline-block;width:14px;text-align:center;font-size:10px;color:var(--text-muted);flex-shrink:0;transition:transform .15s}
-.fx-dir-arrow.open{transform:rotate(90deg)}
-.fx-dir-icon{flex-shrink:0;font-size:12px}
-.fx-children{overflow:hidden}
-.fx-file{display:flex;align-items:center;gap:4px;padding:3px 8px 3px 0;cursor:pointer;border-radius:4px;font-size:12px;color:var(--text-secondary);user-select:none}
-.fx-file:hover{background:var(--bg-hover);color:var(--text-primary)}
-.fx-file.on{background:var(--accent-glow);color:var(--accent)}
-.fx-file-icon{flex-shrink:0;font-size:11px;color:var(--text-muted)}
-.fx-file-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #tag-filter{display:none;flex-wrap:wrap;gap:4px;padding:6px 8px;border-top:1px solid var(--border);background:var(--bg-secondary);overflow-y:auto;overflow-x:hidden;max-height:130px;flex-shrink:0;align-content:flex-start}
 #tag-filter::-webkit-scrollbar{width:3px}
 #tag-filter::-webkit-scrollbar-thumb{background:var(--border-med);border-radius:4px}
@@ -456,7 +440,6 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',ui-sans-serif,system
     <div id="sidebar">
       <div id="sb-header">
         <div class="sb-tab on" data-sb="explorer">Notas</div>
-        <div class="sb-tab" data-sb="files">Arquivos</div>
         <div class="sb-tab" data-sb="backlinks">Links</div>
         <div class="sb-tab" data-sb="outline">Índice</div>
       </div>
@@ -587,10 +570,6 @@ let sidebarOpen=true;
 let focusMode=false;
 let searchQuery="";
 let activeTagFilter="";
-// File Explorer state
-let fxRootHandle=null;   // DirectoryFileSystemHandle da pasta raiz
-let fxTree=null;         // árvore {name, kind, handle, children[]}
-let fxExpanded=new Set();// paths expandidos
 let installPromptEvent=null;
 
 // File System handles: noteId → FileSystemFileHandle
@@ -629,12 +608,7 @@ function _allTitleIndex(){
 function genId(){const n=new Date();return n.getFullYear()+String(n.getMonth()+1).padStart(2,"0")+String(n.getDate()).padStart(2,"0")+String(n.getHours()).padStart(2,"0")+String(n.getMinutes()).padStart(2,"0");}
 function tod(){return new Date().toISOString().slice(0,10);}
 function save(){try{localStorage.setItem("askesis-notes",JSON.stringify(notes));}catch{}}
-function curNote(){
-  const tab=tabs[activeTab];
-  if(!tab) return null;
-  if(tab.type==="file") return {id:null, title:tab.title, content:tab.content||"", _fileTab:true};
-  return notes.find(n=>n.id===tab.noteId);
-}
+function curNote(){return notes.find(n=>n.id===tabs[activeTab]?.noteId);}
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 function slugify(t){return t.replace(/\s+/g,"-").replace(/[^\w\-]/g,"");}
 
@@ -1557,19 +1531,12 @@ function renderThemeGrid(){
 function renderTabs(){
   const bar=document.getElementById("tabs-bar");bar.innerHTML="";
   tabs.forEach((tab,idx)=>{
+    const note=notes.find(n=>n.id===tab.noteId);
     const d=document.createElement("div");
     d.className="tab"+(activeTab===idx?" on":"");
-    let label, icon="";
-    if(tab.type==="file"){
-      label=tab.title||tab.path||"Arquivo";
-      icon="📄 ";
-    } else {
-      const note=notes.find(n=>n.id===tab.noteId);
-      label=note?note.title:"Sem título";
-      const hasFh=note&&(fileHandles[note.id]||_allTitleIndex()[note.title?.toLowerCase()]);
-      if(hasFh) icon="📄 ";
-    }
-    d.innerHTML=`<span class="tab-name">${icon}${escHtml(label)}</span><span class="tab-x">×</span>`;
+    // show folder icon if note has a folder handle
+    const hasFh=note&&(fileHandles[note.id]||_allTitleIndex()[note.title?.toLowerCase()]);
+    d.innerHTML=`<span class="tab-name">${hasFh?"📄 ":""}${note?note.title:"Sem título"}</span><span class="tab-x">×</span>`;
     d.onclick=(e)=>{if(e.target.classList.contains("tab-x")){closeTab(idx);return;}setActiveTab(idx);};
     bar.appendChild(d);
   });
@@ -1695,148 +1662,6 @@ function renderPreview(){
 }
 
 // ══════════════════════════════════════════
-//  FILE EXPLORER
-// ══════════════════════════════════════════
-async function fxReadTree(dirHandle, path=""){
-  const node={name:dirHandle.name, kind:"dir", handle:dirHandle, path, children:[]};
-  for await(const [name, handle] of dirHandle.entries()){
-    if(name.startsWith(".")) continue;
-    const childPath=path?path+"/"+name:name;
-    if(handle.kind==="directory"){
-      node.children.push(await fxReadTree(handle, childPath));
-    } else if(/\.(md|markdown|txt)$/i.test(name)){
-      node.children.push({name, kind:"file", handle, path:childPath});
-    }
-  }
-  // dirs first, then files, both alphabetical
-  node.children.sort((a,b)=>{
-    if(a.kind!==b.kind) return a.kind==="dir"?-1:1;
-    return a.name.localeCompare(b.name);
-  });
-  return node;
-}
-
-// Abre um arquivo externo numa tab {type:"file"}
-async function fxOpenFile(node){
-  // Verifica se já existe tab para este path
-  const existing=tabs.findIndex(t=>t.type==="file"&&t.path===node.path);
-  if(existing>=0){activeTab=existing;renderTabs();renderEditor();return;}
-  const file=await node.handle.getFile();
-  const content=await file.text();
-  const title=node.name.replace(/\.(md|markdown|txt)$/i,"");
-  tabs.push({type:"file", fileHandle:node.handle, path:node.path, title, content});
-  activeTab=tabs.length-1;
-  renderTabs();renderEditor();renderSidebar();renderStatus();
-}
-
-function buildFxTree(node, depth, container){
-  if(node.kind==="dir" && depth===0){
-    // Raiz: renderiza filhos diretos sem mostrar o nó raiz
-    node.children.forEach(c=>buildFxTree(c, 0, container));
-    return;
-  }
-  if(node.kind==="dir"){
-    const isOpen=fxExpanded.has(node.path);
-    // Linha da pasta
-    const row=document.createElement("div");
-    row.className="fx-dir";
-    row.dataset.fxdir=node.path;
-    row.style.paddingLeft=(depth*14+4)+"px";
-    row.innerHTML=`<span class="fx-dir-arrow${isOpen?" open":""}">▶</span><span class="fx-dir-icon">📁</span><span class="fx-dir-name">${escHtml(node.name)}</span>`;
-    container.appendChild(row);
-    // Bloco de filhos
-    const childBlock=document.createElement("div");
-    childBlock.className="fx-children";
-    if(!isOpen) childBlock.style.display="none";
-    container.appendChild(childBlock);
-    if(isOpen){
-      node.children.forEach(c=>buildFxTree(c, depth+1, childBlock));
-    }
-    // Toggle expand/collapse
-    row.onclick=()=>{
-      if(fxExpanded.has(node.path)){
-        fxExpanded.delete(node.path);
-        row.querySelector(".fx-dir-arrow").classList.remove("open");
-        childBlock.style.display="none";
-        childBlock.innerHTML="";
-      } else {
-        fxExpanded.add(node.path);
-        row.querySelector(".fx-dir-arrow").classList.add("open");
-        childBlock.style.display="";
-        node.children.forEach(c=>buildFxTree(c, depth+1, childBlock));
-      }
-    };
-    return;
-  }
-  if(node.kind==="file"){
-    const isOn=tabs[activeTab]?.type==="file"&&tabs[activeTab]?.path===node.path;
-    const row=document.createElement("div");
-    row.className="fx-file"+(isOn?" on":"");
-    row.dataset.fxpath=node.path;
-    row.style.paddingLeft=(depth*14+4)+"px";
-    row.innerHTML=`<span class="fx-file-icon">◦</span><span class="fx-file-name">${escHtml(node.name)}</span>`;
-    row.onclick=async()=>{ await fxOpenFile(node); };
-    container.appendChild(row);
-  }
-}
-
-function renderFileExplorer(){
-  const cont=document.getElementById("sb-content");
-  // Barra superior
-  document.getElementById("sb-search").style.display="none";
-  document.getElementById("tag-filter").className="";
-  document.getElementById("tag-filter").innerHTML="";
-  // fx-bar: mostrar sempre no modo files
-  let fxBar=document.getElementById("fx-bar");
-  if(!fxBar){
-    fxBar=document.createElement("div");
-    fxBar.id="fx-bar";
-    document.getElementById("sb-body").insertBefore(fxBar, cont);
-  }
-  fxBar.style.display="flex";
-  fxBar.innerHTML=fxRootHandle
-    ?`<span class="fx-root-name" title="${escHtml(fxRootHandle.name)}">📂 ${escHtml(fxRootHandle.name)}</span>
-       <button id="fx-reload">↺</button>
-       <button id="fx-close">✕</button>`
-    :`<button id="fx-open-btn">Abrir pasta…</button>`;
-  // Bind
-  document.getElementById("fx-open-btn")?.addEventListener("click", fxPickFolder);
-  document.getElementById("fx-reload")?.addEventListener("click", async()=>{
-    if(!fxRootHandle) return;
-    fxTree=await fxReadTree(fxRootHandle);
-    renderFileExplorer();
-  });
-  document.getElementById("fx-close")?.addEventListener("click",()=>{
-    fxRootHandle=null; fxTree=null; fxExpanded.clear();
-    renderFileExplorer();
-  });
-  // Árvore
-  if(!fxTree){cont.innerHTML=`<div class="sb-empty">Nenhuma pasta aberta.</div>`;return;}
-  cont.innerHTML="";
-  buildFxTree(fxTree, 0, cont);
-}
-
-function fxFindNode(node, path){
-  if(node.path===path) return node;
-  for(const c of node.children||[]){
-    const found=fxFindNode(c,path);
-    if(found) return found;
-  }
-  return null;
-}
-
-async function fxPickFolder(){
-  if(!window.showDirectoryPicker){alert("Chrome/Edge necessário.");return;}
-  try{
-    const handle=await window.showDirectoryPicker({mode:"read"});
-    fxRootHandle=handle;
-    fxTree=await fxReadTree(handle);
-    fxExpanded.clear();
-    renderFileExplorer();
-  }catch(e){if(e.name!=="AbortError")alert("Erro: "+e.message);}
-}
-
-// ══════════════════════════════════════════
 //  TAG FILTER
 // ══════════════════════════════════════════
 function renderTagFilter(){
@@ -1872,11 +1697,7 @@ function renderSidebar(){
   const note=curNote();
   const cont=document.getElementById("sb-content");
   const q=searchQuery.toLowerCase();
-  // Ocultar fx-bar fora do modo files
-  const fxBar=document.getElementById("fx-bar");
-  if(fxBar) fxBar.style.display=sidebarMode==="files"?"flex":"none";
   renderTagFilter();
-  if(sidebarMode==="files"){renderFileExplorer();return;}
 
   if(sidebarMode==="explorer"){
     // ── Search mode: flat list across all notes ──
@@ -2114,17 +1935,6 @@ let _previewTimer=null;
 let _heavyTimer=null;
 
 function updateNote(content){
-  const tab=tabs[activeTab];
-  if(!tab) return;
-  // Tab de arquivo externo: guarda conteúdo na própria tab
-  if(tab.type==="file"){
-    tab.content=content;
-    setSaved(false,"● modificado");
-    renderHighlight();
-    clearTimeout(_previewTimer);
-    _previewTimer=setTimeout(renderPreview, 120);
-    return;
-  }
   const n=curNote();if(!n)return;
   n.content=content;
   n.updated=tod();
@@ -2414,55 +2224,14 @@ async function saveNoteToFile(note, forceDialog){
   }catch(e){if(e.name!=="AbortError")alert("Erro ao salvar: "+e.message);}
 }
 
-// Resolve um fileHandle fresco navegando pela árvore de diretórios
-async function fxResolveHandle(path){
-  if(!fxRootHandle) return null;
-  const parts=path.split("/");
-  let dir=fxRootHandle;
-  for(let i=0;i<parts.length-1;i++){
-    try{ dir=await dir.getDirectoryHandle(parts[i]); }
-    catch(e){ return null; }
-  }
-  try{ return await dir.getFileHandle(parts[parts.length-1]); }
-  catch(e){ return null; }
-}
-
-async function fxWriteHandle(handle, content){
-  const perm=await handle.requestPermission({mode:"readwrite"});
-  if(perm!=="granted") throw new Error("Permissão de escrita negada.");
-  const writable=await handle.createWritable();
-  await writable.write(content);
-  await writable.close();
-}
-
-async function saveActiveTab(forceDialog=false){
-  const tab=tabs[activeTab];
-  if(!tab) return;
-  if(tab.type==="file"){
-    try{
-      await fxWriteHandle(tab.fileHandle, tab.content||"");
-      setSaved(true);
-    }catch(e){
-      if(e.name==="AbortError") return;
-      // Handle inválido (suspensão no Android) — resolver pela árvore
-      try{
-        const fresh=await fxResolveHandle(tab.path);
-        if(!fresh) throw new Error("Não foi possível localizar o arquivo na árvore.");
-        tab.fileHandle=fresh; // atualiza o handle na tab
-        await fxWriteHandle(fresh, tab.content||"");
-        setSaved(true);
-      }catch(e2){
-        if(e2.name!=="AbortError") alert("Erro ao salvar: "+e2.message);
-      }
-    }
-    return;
-  }
-  const n=curNote();
-  if(n) await saveNoteToFile(n,forceDialog);
-}
-
-document.getElementById("btn-save").onclick=async()=>saveActiveTab(false);
-document.getElementById("btn-save-as").onclick=async()=>saveActiveTab(true);
+document.getElementById("btn-save").onclick=async()=>{
+  const n=curNote();if(!n)return;
+  await saveNoteToFile(n,false);
+};
+document.getElementById("btn-save-as").onclick=async()=>{
+  const n=curNote();if(!n)return;
+  await saveNoteToFile(n,true);
+};
 
 // ══════════════════════════════════════════
 //  EVENTS
@@ -2538,7 +2307,7 @@ document.getElementById("mn-preview").onclick=()=>{
 };
 
 document.getElementById("mn-save").onclick=()=>{
-  saveActiveTab(false);
+  const n=curNote();if(n)saveNoteToFile(n,false);
   setMobileTab("mn-save");
   setTimeout(()=>setMobileTab("mn-editor"),600);
 };
@@ -2597,7 +2366,7 @@ document.getElementById("search-input").oninput=e=>{searchQuery=e.target.value;r
 const editorEl=document.getElementById("editor");
 editorEl.oninput=e=>updateNote(e.target.value);
 editorEl.onscroll=syncScroll;
-editorEl.onkeydown=async e=>{
+editorEl.onkeydown=e=>{
   if(e.key==="Tab"){
     e.preventDefault();
     const ta=e.target,s=ta.selectionStart;
@@ -2609,24 +2378,17 @@ editorEl.onkeydown=async e=>{
   // Ctrl+S / Cmd+S
   if((e.ctrlKey||e.metaKey)&&e.key==="s"){
     e.preventDefault();
-    await saveActiveTab(false);
+    const n=curNote();if(n)saveNoteToFile(n,false);
   }
   // Atalhos de formatação
   if(e.ctrlKey||e.metaKey){
-    const ta=e.target;
-    const s=ta.selectionStart,end=ta.selectionEnd,sel=ta.value.slice(s,end);
+    const ta=e.target,s=ta.selectionStart,end=ta.selectionEnd,sel=ta.value.slice(s,end);
     let ins=null,cursor=null;
     if(e.key==="b"){ins=`**${sel||"texto"}**`;cursor=sel?s+ins.length:s+2;}
     else if(e.key==="i"&&!e.shiftKey){ins=`*${sel||"texto"}*`;cursor=sel?s+ins.length:s+1;}
-    else if(e.key==="k"&&!e.shiftKey){
-      ins=`[${sel||"texto"}](url)`;
-      cursor=s+(sel||"texto").length+3; // posiciona em "url"
-    }
+    else if(e.key==="k"&&!e.shiftKey){ins=`[${sel||"texto"}](url)`;cursor=s+(sel||"texto").length+3;}
     else if(e.key==="`"&&!e.shiftKey){ins=`\`${sel||"código"}\``;cursor=sel?s+ins.length:s+1;}
-    else if(e.key==="`"&&e.shiftKey){
-      ins=`\`\`\`\n${sel||""}\n\`\`\``;
-      cursor=sel?s+ins.length:s+4;
-    }
+    else if(e.key==="`"&&e.shiftKey){ins=`\`\`\`\n${sel||""}\n\`\`\``;cursor=sel?s+ins.length:s+4;}
     if(ins!==null){
       e.preventDefault();
       ta.value=ta.value.slice(0,s)+ins+ta.value.slice(end);
