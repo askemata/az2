@@ -162,7 +162,9 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',ui-sans-serif,system
 .tbtn:hover{background:var(--bg-hover);color:var(--text-primary)}
 .tsep{width:1px;height:12px;background:var(--border);margin:0 3px;flex-shrink:0}
 
-#editor-wrap{flex:1;position:relative;overflow:hidden;background:var(--editor-bg)}
+#editor-wrap{flex:1;position:relative;overflow:hidden;background:var(--editor-bg);
+  background-image:repeating-linear-gradient(to bottom,transparent,transparent calc(var(--ed-lh)*1em - 1px),var(--border-light) calc(var(--ed-lh)*1em - 1px),var(--border-light) calc(var(--ed-lh)*1em));
+  background-position:0 var(--ed-pad-v);background-size:100% calc(var(--ed-lh)*1em);font-size:var(--ed-size)}
 #hl-layer{position:absolute;top:0;left:0;right:0;padding:var(--ed-pad-v) var(--ed-pad-h);font-family:var(--ed-font);font-size:var(--ed-size);line-height:var(--ed-lh);tab-size:2;white-space:pre-wrap;word-wrap:break-word;overflow:hidden;pointer-events:none;z-index:1;color:var(--sh-plain);will-change:transform;transform:translateY(0)}
 #editor{position:absolute;inset:0;padding:var(--ed-pad-v) var(--ed-pad-h);font-family:var(--ed-font);font-size:var(--ed-size);line-height:var(--ed-lh);tab-size:2;background:transparent;color:transparent;caret-color:var(--accent);-webkit-text-fill-color:transparent;border:none;outline:none;resize:none;overflow-y:scroll;overflow-x:hidden;scrollbar-gutter:stable;white-space:pre-wrap;word-wrap:break-word;z-index:2}
 #editor::selection{background:var(--selection)}
@@ -2384,11 +2386,11 @@ editorEl.onkeydown=e=>{
   if(e.ctrlKey||e.metaKey){
     const ta=e.target,s=ta.selectionStart,end=ta.selectionEnd,sel=ta.value.slice(s,end);
     let ins=null,cursor=null;
-    if(e.key==="b"){ins=`**${sel||"texto"}**`;cursor=sel?s+ins.length:s+2;}
-    else if(e.key==="i"&&!e.shiftKey){ins=`*${sel||"texto"}*`;cursor=sel?s+ins.length:s+1;}
-    else if(e.key==="k"&&!e.shiftKey){ins=`[${sel||"texto"}](url)`;cursor=s+(sel||"texto").length+3;}
-    else if(e.key==="`"&&!e.shiftKey){ins=`\`${sel||"código"}\``;cursor=sel?s+ins.length:s+1;}
-    else if(e.key==="`"&&e.shiftKey){ins=`\`\`\`\n${sel||""}\n\`\`\``;cursor=sel?s+ins.length:s+4;}
+    if(e.key==="b"){ins=`**${sel}**`;cursor=sel?s+ins.length:s+2;}
+    else if(e.key==="i"&&!e.shiftKey){ins=`*${sel}*`;cursor=sel?s+ins.length:s+1;}
+    else if(e.key==="k"&&!e.shiftKey){ins=`[${sel}](url)`;cursor=sel?s+sel.length+3:s+1;}
+    else if(e.key==="`"&&!e.shiftKey){ins=`\`${sel}\``;cursor=sel?s+ins.length:s+1;}
+    else if(e.key==="`"&&e.shiftKey){ins=`\`\`\`\n${sel}\n\`\`\``;cursor=sel?s+ins.length:s+4;}
     if(ins!==null){
       e.preventDefault();
       ta.value=ta.value.slice(0,s)+ins+ta.value.slice(end);
