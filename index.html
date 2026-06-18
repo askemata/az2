@@ -519,6 +519,7 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',ui-sans-serif,system
       <div class="ex-opt" data-fmt="html-latex"><span class="ex-ico">🏛</span><div><div class="ex-lbl">HTML — Latin Modern</div><div class="ex-dsc">.html — tipografia estilo LaTeX</div></div></div>
       <div class="ex-opt" data-fmt="html"><span class="ex-ico">🌐</span><div><div class="ex-lbl">HTML — Simples</div><div class="ex-dsc">.html — página web com estilo básico</div></div></div>
       <div class="ex-opt" data-fmt="pdf"><span class="ex-ico">📑</span><div><div class="ex-lbl">PDF — Latin Modern</div><div class="ex-dsc">Imprime via diálogo do navegador (A4)</div></div></div>
+      <div class="ex-opt" data-fmt="pdf-academic"><span class="ex-ico">📰</span><div><div class="ex-lbl">PDF — Acadêmico (2 colunas)</div><div class="ex-dsc">Artigo científico A4, 2 colunas, notas no rodapé</div></div></div>
       <div class="ex-opt" data-fmt="fodt"><span class="ex-ico">📝</span><div><div class="ex-lbl">Flat OpenDocument</div><div class="ex-dsc">.fodt — compatível com LibreOffice / Word</div></div></div>
       <div class="ex-opt" data-fmt="rtf"><span class="ex-ico">📋</span><div><div class="ex-lbl">Rich Text Format</div><div class="ex-dsc">.rtf — compatível com Word, Pages, Writer</div></div></div>
       <div class="ex-opt" data-fmt="text"><span class="ex-ico">📄</span><div><div class="ex-lbl">Texto Simples</div><div class="ex-dsc">.txt — sem formatação</div></div></div>
@@ -891,11 +892,17 @@ function _hlCacheReset(){ _hlCache=[]; _hlLines=[]; }
 // ══════════════════════════════════════════
 //  EXPORT — Latin Modern CSS
 // ══════════════════════════════════════════
-const LATEX_CSS=`
+// Shared Latin Modern @font-face block — used by LATEX_CSS (HTML/PDF simples)
+// and by ACADEMIC_CSS (PDF acadêmico em 2 colunas), evitando duplicação.
+const LM_FONT_FACES=`
 @font-face{font-family:'Latin Modern';font-style:normal;font-weight:normal;src:url('https://latex.now.sh/fonts/LM-regular.woff2') format('woff2'),url('https://latex.now.sh/fonts/LM-regular.woff') format('woff')}
 @font-face{font-family:'Latin Modern';font-style:italic;font-weight:normal;src:url('https://latex.now.sh/fonts/LM-italic.woff2') format('woff2'),url('https://latex.now.sh/fonts/LM-italic.woff') format('woff')}
 @font-face{font-family:'Latin Modern';font-style:normal;font-weight:bold;src:url('https://latex.now.sh/fonts/LM-bold.woff2') format('woff2'),url('https://latex.now.sh/fonts/LM-bold.woff') format('woff')}
 @font-face{font-family:'Latin Modern';font-style:italic;font-weight:bold;src:url('https://latex.now.sh/fonts/LM-bold-italic.woff2') format('woff2'),url('https://latex.now.sh/fonts/LM-bold-italic.woff') format('woff')}
+`;
+
+const LATEX_CSS=`
+${LM_FONT_FACES}
 html{font-size:1rem;scroll-behavior:smooth}
 body{font-family:'Latin Modern',Georgia,'Times New Roman',serif;max-width:48em;margin:4em auto;padding:0 2em;line-height:1.8;color:#111}
 h1,h2,h3,h4{font-family:'Latin Modern',Georgia,serif;font-weight:normal;margin-top:2em;margin-bottom:.5em}
@@ -938,6 +945,149 @@ function buildLatexHtml(note){
 </head>
 <body>
 ${bodyHtml}
+</body>
+</html>`;
+}
+
+// ══════════════════════════════════════════
+//  PDF ACADÊMICO (2 colunas) — buildAcademicHtml()
+//  Layout estilo artigo científico LaTeX (A4, 2 colunas, notas de
+//  rodapé numeradas no pé da coluna). Usa Paged.js (CDN) só nesta
+//  exportação — nenhuma outra rota é afetada. Reaproveita md() e
+//  parseFrontmatter() já existentes; não modifica o renderer.
+// ══════════════════════════════════════════
+
+// Escapa aspas/barras para uso seguro dentro de content:"..." em CSS.
+function cssStr(s){return String(s||"").replace(/\\/g,"\\\\").replace(/"/g,'\\"');}
+
+// Pós-processa o HTML já renderizado por md() para o layout acadêmico:
+// 1) remove um <h1> inicial duplicado (o título já vai no cabeçalho);
+// 2) converte as notas de rodapé (lista final + <sup><a class="fn-ref">)
+//    em <span class="footnote"> inline, que o Paged.js move para o
+//    pé da coluna via `float: footnote`.
+function prepAcademicBody(bodyHtml){
+  const tmp=document.createElement("div");
+  tmp.innerHTML=bodyHtml;
+  // Pula divs .spacer (linhas em branco) que antecedem o primeiro
+  // elemento "de verdade" antes de checar se é o <h1> duplicado.
+  let first=tmp.firstElementChild;
+  while(first&&first.classList&&first.classList.contains("spacer"))first=first.nextElementSibling;
+  if(first&&first.tagName==="H1"){
+    while(tmp.firstElementChild&&tmp.firstElementChild!==first)tmp.firstElementChild.remove();
+    first.remove();
+  }
+  const section=tmp.querySelector("section.footnotes");
+  if(section){
+    const defs={};
+    section.querySelectorAll("li[id^='fn-']").forEach(li=>{
+      const id=li.id.slice(3);
+      const back=li.querySelector(".fn-back");
+      if(back)back.remove();
+      defs[id]=li.innerHTML.trim();
+    });
+    let fnIndex=0;
+    tmp.querySelectorAll("a.fn-ref").forEach(a=>{
+      fnIndex++;
+      const id=a.id.slice(6); // "fnref-XXX" -> "XXX"
+      const span=document.createElement("span");
+      span.className="footnote";
+      // Numeramos manualmente (1, 2, 3… na ordem de aparição) em vez de
+      // confiar em ::footnote-marker: o Paged.js tem um bug conhecido em
+      // que esse contador mostra o último valor em todas as notas da
+      // página (https://gitlab.coko.foundation/pagedjs/pagedjs/-/issues/410).
+      // ::footnote-call (o número sobrescrito no corpo do texto) funciona
+      // corretamente e continua sendo usado normalmente.
+      span.innerHTML=`${fnIndex}.&nbsp;${defs[id]||""}`;
+      (a.closest("sup")||a).replaceWith(span);
+    });
+    const sep=tmp.querySelector("hr.fn-sep");
+    if(sep)sep.remove();
+    section.remove();
+  }
+  return tmp.innerHTML;
+}
+
+const ACADEMIC_CSS=`
+${LM_FONT_FACES}
+*{box-sizing:border-box}
+body{font-family:'Latin Modern',Georgia,'Times New Roman',serif;color:#111;font-size:10.3pt;line-height:1.42;margin:0}
+.ac-header{text-align:center;margin-bottom:.9em}
+.ac-header h1{font-size:1.55em;font-weight:bold;line-height:1.25;margin:0 0 .45em}
+.ac-author{font-size:1.05em;margin:.15em 0}
+.ac-institution{font-style:italic;font-size:.92em;margin:.1em 0 .55em}
+.ac-rule{border:none;border-top:.5pt solid #999;width:42%;margin:.55em auto}
+.ac-meta{font-size:.78em;font-style:italic;color:#333;margin:.12em 0}
+.ac-abstract{font-size:.86em;text-align:justify;hyphens:auto;margin:0 7% 1.3em;padding-top:.3em}
+.ac-body{column-count:2;column-gap:1.15em;text-align:justify;hyphens:auto;counter-reset:acsec}
+.ac-body p{margin:0 0 .6em;text-indent:1.1em}
+.ac-body p:first-child,.ac-body h2+p,.ac-body h3+p{text-indent:0}
+.ac-body h2{font-size:1.12em;font-weight:bold;margin:.9em 0 .35em;counter-increment:acsec;counter-reset:acsub}
+.ac-body h2::before{content:counter(acsec)". "}
+.ac-body h3{font-size:1em;font-weight:bold;font-style:italic;margin:.75em 0 .3em;counter-increment:acsub}
+.ac-body h3::before{content:counter(acsec)"."counter(acsub)" "}
+.ac-body blockquote{margin:.8em 1.2em;padding:.5em .9em;font-size:.95em;line-height:1.5;color:#444;border-left:3px solid #999;background:#f7f5f0}
+.ac-body code{font-family:'Courier New',monospace;font-size:.88em;background:#f0ece2;padding:1px 4px;border-radius:2px}
+.ac-body pre{background:#f0ece2;border:1px solid #ddd;padding:.8em;overflow-x:auto;margin:.8em 0;font-size:.82em}
+.ac-body ul,.ac-body ol{padding-left:1.4em;margin:.5em 0;font-size:.97em}
+.ac-body table{width:100%;border-collapse:collapse;margin:.8em 0;font-size:.85em}
+.ac-body td,.ac-body th{border:1px solid #ccc;padding:.35em .6em}
+.ac-body hr{border:none;border-top:.5pt solid #ccc;margin:1em 0}
+.ac-body .spacer{display:none}
+.wikilink-exists{color:#0070b7;text-decoration:underline}
+.wikilink-missing{color:#aaa;text-decoration:underline dashed}
+span.footnote{float:footnote;font-size:.82em;line-height:1.3;text-align:left;hyphens:auto}
+::footnote-call{vertical-align:super;font-size:.7em;line-height:0;content:counter(footnote)}
+::footnote-marker{content:""}
+@page{
+  size:A4;
+  margin:2.1cm 1.8cm 2cm 1.8cm;
+  @footnote{float:bottom;border-top:.5pt solid #999;padding-top:.3em;margin-top:.4em}
+}
+`;
+
+function buildAcademicHtml(note){
+  const fm=parseFrontmatter(note.content)||{};
+  const title       = fm.title        || fm.título       || note.title;
+  const author       = fm.author       || fm.autor        || "";
+  const institution  = fm.institution  || fm.instituição  || fm.affiliation || "";
+  const abstractTxt  = fm.abstract     || fm.resumo        || "";
+  const translatorsV = fm.translators  || fm.tradutores    || "";
+  const translators  = Array.isArray(translatorsV) ? translatorsV.join(" e ") : translatorsV;
+  const notice       = fm.note         || fm.aviso          || "";
+  const footerNotice = [translators?`Tradução de ${translators}`:"",notice].filter(Boolean).join(" — ");
+
+  const headerHtml=`
+<div class="ac-header">
+  <h1>${esc(title)}</h1>
+  ${author?`<p class="ac-author">${esc(author)}</p>`:""}
+  ${institution?`<p class="ac-institution">${esc(institution)}</p>`:""}
+  ${(translators||notice)?`<hr class="ac-rule">
+  ${translators?`<p class="ac-meta">Tradução de ${esc(translators)}</p>`:""}
+  ${notice?`<p class="ac-meta">${esc(notice)}</p>`:""}
+  <hr class="ac-rule">`:""}
+</div>
+${abstractTxt?`<div class="ac-abstract"><strong>Resumo: </strong>${inline(abstractTxt)}</div>`:""}`;
+
+  const bodyHtml=prepAcademicBody(md(note.content));
+
+  const pageCss=`@page{ @top-center{content:"${cssStr(title)}";font-size:8pt;font-style:italic;color:#555} @bottom-left{content:"${cssStr(footerNotice)}";font-size:6.5pt;color:#777} @bottom-right{content:counter(page);font-size:8pt;color:#555} }`;
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>${esc(title)}</title>
+<script>window.PagedConfig={after:()=>{window.print();}};<\/script>
+<script src="https://unpkg.com/pagedjs/dist/paged.polyfill.js"><\/script>
+<style>${ACADEMIC_CSS}
+${pageCss}</style>
+</head>
+<body>
+${headerHtml}
+<div class="ac-body">
+${bodyHtml}
+</div>
 </body>
 </html>`;
 }
@@ -998,6 +1148,16 @@ function doExport(note,fmt){
     w.document.write(html);
     w.document.close();
     w.onload=()=>{ w.focus(); w.print(); };
+    return;
+  }
+  if(fmt==="pdf-academic"){
+    // Open paginated window (Paged.js); impressão é disparada pelo
+    // próprio Paged.js (PagedConfig.after) quando a paginação termina.
+    const html=buildAcademicHtml(note);
+    const w=window.open("","_blank");
+    w.document.write(html);
+    w.document.close();
+    w.focus();
     return;
   }
   let c="",mime="text/plain",ext="txt";
