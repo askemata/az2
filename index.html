@@ -557,7 +557,7 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',ui-sans-serif,system
 // ══════════════════════════════════════════
 const THEMES={
   "askesis-dark":{label:"Askesis Dark",vars:{"--bg-primary":"#0e0e0e","--bg-secondary":"#141414","--bg-tertiary":"#1c1c1c","--bg-hover":"#222","--bg-active":"#282828","--border":"#232323","--border-light":"#1c1c1c","--border-med":"#2d2d2d","--text-primary":"#e6e2da","--text-secondary":"#7a766e","--text-muted":"#3e3c38","--text-dim":"#2a2826","--accent":"#b8965a","--accent-dim":"#6b5330","--accent-glow":"rgba(184,150,90,.12)","--link":"#7aa8b8","--tag":"#1e1a12","--tag-text":"#9a7a48","--scrollbar":"#2a2826","--shadow":"0 16px 48px rgba(0,0,0,.8),0 4px 12px rgba(0,0,0,.5)","--shadow-sm":"0 4px 16px rgba(0,0,0,.5)","--editor-bg":"#0e0e0e","--preview-bg":"#111111","--code-bg":"#181818","--selection":"rgba(184,150,90,.18)","--sh-head":"#b8965a","--sh-bold":"#e6e2da","--sh-italic":"#9e9a92","--sh-code":"#7aa8b8","--sh-cb":"#6a8898","--sh-quote":"#524e48","--sh-link":"#7aa8b8","--sh-hr":"#282828","--sh-list":"#b8965a","--sh-fm":"#2e2c28","--sh-wiki":"#7aa8b8","--sh-plain":"#e6e2da"}},
-  "askesis-light":{label:"Askesis Light",vars:{"--bg-primary":"#ffffff","--bg-secondary":"#f9fafb","--bg-tertiary":"#f3f4f6","--bg-hover":"#f3f4f6","--bg-active":"#e9ecef","--border":"#e5e7eb","--border-light":"#f3f4f6","--border-med":"#d1d5db","--text-primary":"#111827","--text-secondary":"#6b7280","--text-muted":"#9ca3af","--text-dim":"#d1d5db","--accent":"#b8965a","--accent-dim":"#d4a96a","--accent-glow":"rgba(184,150,90,.1)","--link":"#2563eb","--tag":"#fef9ee","--tag-text":"#92400e","--scrollbar":"#e5e7eb","--shadow":"0 4px 24px rgba(0,0,0,.08),0 1px 4px rgba(0,0,0,.04)","--shadow-sm":"0 2px 8px rgba(0,0,0,.06)","--editor-bg":"#ffffff","--preview-bg":"#ffffff","--code-bg":"#f9fafb","--selection":"rgba(184,150,90,.15)","--sh-head":"#92400e","--sh-bold":"#111827","--sh-italic":"#6b7280","--sh-code":"#2563eb","--sh-cb":"#6b7280","--sh-quote":"#9ca3af","--sh-link":"#2563eb","--sh-hr":"#e5e7eb","--sh-list":"#b8965a","--sh-fm":"#d1d5db","--sh-wiki":"#2563eb","--sh-plain":"#111827"}},
+  "askesis-light":{label:"Askesis Light",vars:{"--bg-primary":"#ffffff","--bg-secondary":"#f9fafb","--bg-tertiary":"#f3f4f6","--bg-hover":"#f3f4f6","--bg-active":"#e9ecef","--border":"#e5e7eb","--border-light":"#f3f4f6","--border-med":"#d1d5db","--text-primary":"#111827","--text-secondary":"#6b7280","--text-muted":"#9ca3af","--text-dim":"#d1d5db","--accent":"#b8965a","--accent-dim":"#d4a96a","--accent-glow":"rgba(184,150,90,.1)","--link":"#2563eb","--tag":"#fef9ee","--tag-text":"#92400e","--scrollbar":"#e5e7eb","--shadow":"0 4px 24px rgba(0,0,0,.08),0 1px 4px rgba(0,0,0,.04)","--shadow-sm":"0 2px 8px rgba(0,0,0,.06)","--editor-bg":"#ffffff","--preview-bg":"#ffffff","--code-bg":"#f9fafb","--selection":"rgba(184,150,90,.28)","--sh-head":"#92400e","--sh-bold":"#111827","--sh-italic":"#6b7280","--sh-code":"#2563eb","--sh-cb":"#6b7280","--sh-quote":"#9ca3af","--sh-link":"#2563eb","--sh-hr":"#e5e7eb","--sh-list":"#b8965a","--sh-fm":"#d1d5db","--sh-wiki":"#2563eb","--sh-plain":"#111827"}},
   "hc-dark":{label:"Alto Contraste Escuro",vars:{"--bg-primary":"#000","--bg-secondary":"#080808","--bg-tertiary":"#111","--bg-hover":"#1c1c1c","--bg-active":"#242424","--border":"#383838","--border-light":"#242424","--border-med":"#444","--text-primary":"#fff","--text-secondary":"#ccc","--text-muted":"#666","--text-dim":"#333","--accent":"#ffcc00","--accent-dim":"#7a6200","--accent-glow":"rgba(255,204,0,.12)","--link":"#66ccff","--tag":"#002800","--tag-text":"#66ff66","--scrollbar":"#333","--shadow":"0 8px 32px rgba(0,0,0,.95)","--shadow-sm":"0 4px 16px rgba(0,0,0,.8)","--editor-bg":"#000","--preview-bg":"#000","--code-bg":"#0c0c0c","--selection":"rgba(255,204,0,.25)","--sh-head":"#ffcc00","--sh-bold":"#ffffff","--sh-italic":"#ddddaa","--sh-code":"#66ccff","--sh-cb":"#66ccff","--sh-quote":"#888","--sh-link":"#66ccff","--sh-hr":"#333","--sh-list":"#ffcc00","--sh-fm":"#444","--sh-wiki":"#66ccff","--sh-plain":"#fff"}},
   "hc-light":{label:"Alto Contraste Claro",vars:{"--bg-primary":"#fff","--bg-secondary":"#f0f0f0","--bg-tertiary":"#e0e0e0","--bg-hover":"#d0d0d0","--bg-active":"#c0c0c0","--border":"#000","--border-light":"#888","--border-med":"#666","--text-primary":"#000","--text-secondary":"#111","--text-muted":"#444","--text-dim":"#888","--accent":"#0033cc","--accent-dim":"#6688dd","--accent-glow":"rgba(0,51,204,.1)","--link":"#0000cc","--tag":"#e8ffe8","--tag-text":"#004400","--scrollbar":"#888","--shadow":"0 8px 32px rgba(0,0,0,.3)","--shadow-sm":"0 4px 12px rgba(0,0,0,.2)","--editor-bg":"#fff","--preview-bg":"#fff","--code-bg":"#eee","--selection":"rgba(0,51,204,.15)","--sh-head":"#0033cc","--sh-bold":"#000","--sh-italic":"#333","--sh-code":"#0000cc","--sh-cb":"#0000cc","--sh-quote":"#555","--sh-link":"#0000cc","--sh-hr":"#888","--sh-list":"#0033cc","--sh-fm":"#aaa","--sh-wiki":"#0000cc","--sh-plain":"#000"}},
   "nord":{label:"Nord Calm",vars:{"--bg-primary":"#2e3440","--bg-secondary":"#282e3c","--bg-tertiary":"#232934","--bg-hover":"#3b4252","--bg-active":"#434c5e","--border":"#3b4252","--border-light":"#2e3440","--border-med":"#4c566a","--text-primary":"#d8dee9","--text-secondary":"#9aa4b8","--text-muted":"#555e72","--text-dim":"#404858","--accent":"#88c0d0","--accent-dim":"#4c7a8a","--accent-glow":"rgba(136,192,208,.1)","--link":"#81a1c1","--tag":"#2a3828","--tag-text":"#a3be8c","--scrollbar":"#3b4252","--shadow":"0 8px 32px rgba(0,0,0,.5)","--shadow-sm":"0 4px 16px rgba(0,0,0,.4)","--editor-bg":"#2a3040","--preview-bg":"#2a3040","--code-bg":"#232934","--selection":"rgba(136,192,208,.2)","--sh-head":"#88c0d0","--sh-bold":"#eceff4","--sh-italic":"#a3aec0","--sh-code":"#81a1c1","--sh-cb":"#81a1c1","--sh-quote":"#677080","--sh-link":"#81a1c1","--sh-hr":"#3b4252","--sh-list":"#88c0d0","--sh-fm":"#404858","--sh-wiki":"#81a1c1","--sh-plain":"#d8dee9"}},
@@ -872,6 +872,9 @@ function inline(text){
   t=t.replace(/_(.+?)_/g,"<em>$1</em>");
   t=t.replace(/~~(.+?)~~/g,"<del>$1</del>");
   t=t.replace(/`([^`]+)`/g,"<code>$1</code>");
+  // Imagem: ![alt](url) — deve vir ANTES do link para não ser capturada como link
+  t=t.replace(/!\[([^\]]*)\]\(([^)]+)\)/g,
+    '<img src="$2" alt="$1" style="max-width:100%;height:auto"/>');
   t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
   return t;
 }
@@ -997,6 +1000,9 @@ function hlInline(raw){
   // _italic_ — must not start/end with _ (would be __bold__)
   t=t.replace(/(?<!_)_([^_\n]+?)_(?!_)/g,
     (_,m)=>`<span style="color:var(--sh-italic);font-style:italic">_${m}_</span>`);
+  // ![alt](url) — imagem, deve vir ANTES do link
+  t=t.replace(/!\[([^\]\n]*)\]\(([^)\n]+)\)/g,
+    (_,alt,url)=>`<span style="color:var(--sh-list)">![${alt}](${url})</span>`);
   // [text](url)
   t=t.replace(/\[([^\]\n]+)\]\(([^)\n]+)\)/g,
     (_,txt,url)=>`<span style="color:var(--sh-link)">[${txt}](${url})</span>`);
@@ -1124,6 +1130,7 @@ const LATEX_CSS=`
 ${LM_FONT_FACES}
 html{font-size:1rem;scroll-behavior:smooth}
 body{font-family:'Latin Modern',Georgia,'Times New Roman',serif;max-width:48em;margin:4em auto;padding:0 2em;line-height:1.8;color:#111}
+img{max-width:100%;height:auto;display:block;margin:1.5em auto}
 h1,h2,h3,h4{font-family:'Latin Modern',Georgia,serif;font-weight:normal;margin-top:2em;margin-bottom:.5em}
 h1{font-size:2em;text-align:center;border-bottom:1px solid #ccc;padding-bottom:.4em;margin-top:1em}
 h2{font-size:1.4em}h3{font-size:1.15em}h4{font-size:1em;font-weight:bold}
@@ -1246,6 +1253,9 @@ body{font-family:'Latin Modern',Georgia,'Times New Roman',serif;color:#111;font-
 .ac-body h3::before{content:counter(acsec)"."counter(acsub)" "}
 .ac-body blockquote{margin:.8em 1.2em;padding:.5em .9em;font-size:.95em;line-height:1.5;color:#444;border-left:3px solid #CCC;background:#FAFAFA}
 .ac-body code{font-family:'Courier New',monospace;font-size:.88em;background:#f0ece2;padding:1px 4px;border-radius:2px}
+.ac-body img{max-width:100%;height:auto;display:block;margin:.8em auto}
+.ac-body figure{margin:.8em 0;text-align:center;break-inside:avoid}
+.ac-body figcaption{font-size:.82em;color:#666;font-style:italic;margin-top:.3em}
 .ac-body pre{background:#f0ece2;border:1px solid #ddd;padding:.8em;overflow-x:auto;margin:.8em 0;font-size:.82em}
 .ac-body ul,.ac-body ol{padding-left:1.4em;margin:.5em 0;font-size:.97em}
 .ac-body table{width:100%;border-collapse:collapse;margin:.8em 0;font-size:.85em}
@@ -1385,7 +1395,7 @@ function doExport(note,fmt){
   else if(fmt==="html-latex"){c=buildLatexHtml(note);mime="text/html";ext="html";}
   else if(fmt==="html"){
     const body=md(note.content);
-    c=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${note.title}</title><style>body{font-family:Georgia,serif;max-width:760px;margin:60px auto;padding:0 20px;line-height:1.8;color:#2c2a26}code{background:#f0ece2;padding:2px 6px;border-radius:3px;font-size:.9em}pre{background:#f0ece2;padding:16px;border-radius:6px;overflow-x:auto}blockquote{border-left:3px solid #b8965a;padding-left:16px;color:#7a6640;margin:0;font-style:italic}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:8px 12px}th{background:#f5f0e8}.wikilink{color:#2a6e87}</style></head><body>${body}</body></html>`;
+    c=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${note.title}</title><style>body{font-family:Georgia,serif;max-width:760px;margin:60px auto;padding:0 20px;line-height:1.8;color:#2c2a26}code{background:#f0ece2;padding:2px 6px;border-radius:3px;font-size:.9em}img{max-width:100%;height:auto;display:block;margin:1.5em auto}pre{background:#f0ece2;padding:16px;border-radius:6px;overflow-x:auto}blockquote{border-left:3px solid #b8965a;padding-left:16px;color:#7a6640;margin:0;font-style:italic}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:8px 12px}th{background:#f5f0e8}.wikilink{color:#2a6e87}</style></head><body>${body}</body></html>`;
     mime="text/html";ext="html";
   } else if(fmt==="fodt"){c=mdToFodt(note);mime="application/vnd.oasis.opendocument.text-flat-xml";ext="fodt";}
   else if(fmt==="rtf"){c=mdToRtf(note);mime="application/rtf";ext="rtf";}
@@ -1557,6 +1567,7 @@ h1,h2,h3,h4{font-family:'Latin Modern',Georgia,serif;font-weight:normal;margin-t
 h1{font-size:2em;border-bottom:1px solid #ccc;padding-bottom:.4em;margin-top:.6em}
 h2{font-size:1.4em}h3{font-size:1.15em}h4{font-size:1em;font-weight:bold}
 p{text-align:justify;hyphens:auto;margin:.8em 0;font-size:1.05em}
+img{max-width:100%;height:auto;display:block;margin:1.5em auto}
 a,a:visited{color:#0070b7;text-decoration:none}
 a:hover{color:#d86d4e;text-decoration:underline}
 strong{font-weight:bold}em{font-style:italic}del{opacity:.5;text-decoration:line-through}
