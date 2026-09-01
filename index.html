@@ -1370,24 +1370,95 @@ function mdToRtf(note){
   return `{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Georgia;}}{\\colortbl;\\red44\\green42\\blue38;}\\deflang1046\\widowctrl\\hyphauto\n\\pard\\sa200\\b\\fs36 ${rtfEsc(note.title)}\\b0\\par\n${body}\n}`;
 }
 
+// ── Embutir imagens locais como data URI ────────────────────────────
+// Caminhos relativos (ex: "grafico.png") não resolvem na janela de
+// impressão, que é gerada via blob. Esta função lê os arquivos de uma
+// pasta escolhida pelo usuário e converte cada imagem em base64.
+// URLs http(s) e data: já funcionam e são deixadas intactas.
+function _localImagePaths(content){
+  const out=new Set();
+  for(const m of content.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)){
+    const src=m[1].trim();
+    if(/^(https?:|data:)/i.test(src)) continue;
+    out.add(src);
+  }
+  return [...out];
+}
+
+async function _readFileAsDataUrl(fileHandle){
+  const file=await fileHandle.getFile();
+  return await new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result);
+    r.onerror=()=>rej(new Error("Falha ao ler "+file.name));
+    r.readAsDataURL(file);
+  });
+}
+
+// Navega a árvore a partir de dirHandle seguindo um caminho relativo
+async function _resolveImageHandle(dirHandle, path){
+  const parts=path.split("/").filter(p=>p&&p!==".");
+  let dir=dirHandle;
+  for(let i=0;i<parts.length-1;i++){
+    dir=await dir.getDirectoryHandle(parts[i]);
+  }
+  return await dir.getFileHandle(parts[parts.length-1]);
+}
+
+// Retorna o conteúdo da nota com as imagens locais trocadas por data URI.
+// Se o usuário cancelar a escolha da pasta, devolve o conteúdo original.
+async function embedLocalImages(content){
+  const paths=_localImagePaths(content);
+  if(!paths.length) return content;
+  if(!window.showDirectoryPicker){
+    alert("Este navegador não permite ler a pasta das imagens.\nAs imagens locais não serão embutidas.");
+    return content;
+  }
+  let dirHandle;
+  try{
+    alert(`Este documento tem ${paths.length} imagem(ns) local(is).\nEscolha a pasta onde elas estão.`);
+    dirHandle=await window.showDirectoryPicker({mode:"read"});
+  }catch(e){
+    return content; // cancelou: segue sem embutir
+  }
+  const failed=[];
+  let out=content;
+  for(const p of paths){
+    try{
+      const fh=await _resolveImageHandle(dirHandle,p);
+      const dataUrl=await _readFileAsDataUrl(fh);
+      // Troca todas as ocorrências desse caminho exato
+      out=out.split("]("+p+")").join("]("+dataUrl+")");
+    }catch(e){ failed.push(p); }
+  }
+  if(failed.length) alert("Não encontrei na pasta escolhida:\n"+failed.join("\n"));
+  return out;
+}
+
 function doExport(note,fmt){
   if(fmt==="pdf"){
     // Open print window with Latin Modern styling
-    const html=buildLatexHtml(note);
-    const w=window.open("","_blank");
-    w.document.write(html);
-    w.document.close();
-    w.onload=()=>{ w.focus(); w.print(); };
+    (async()=>{
+      const content=await embedLocalImages(note.content);
+      const html=buildLatexHtml({...note,content});
+      const w=window.open("","_blank");
+      w.document.write(html);
+      w.document.close();
+      w.onload=()=>{ w.focus(); w.print(); };
+    })();
     return;
   }
   if(fmt==="pdf-academic"){
-    // Open paginated window (Paged.js); impressão é disparada pelo
-    // próprio Paged.js (PagedConfig.after) quando a paginação termina.
-    const html=buildAcademicHtml(note);
-    const w=window.open("","_blank");
-    w.document.write(html);
-    w.document.close();
-    w.focus();
+    // Imagens locais precisam virar data URI: a janela de impressão é
+    // criada via blob e não resolve caminhos relativos.
+    (async()=>{
+      const content=await embedLocalImages(note.content);
+      const html=buildAcademicHtml({...note,content});
+      const w=window.open("","_blank");
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+    })();
     return;
   }
   let c="",mime="text/plain",ext="txt";
